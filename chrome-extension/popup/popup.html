@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>BOSS 本地投递助手</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+<main>
+    <h1>BOSS 本地投递助手</h1>
+    <p id="status" class="status">正在检查连接状态……</p>
+    <label for="pairing-code">管理端一次性配对码</label>
+    <input id="pairing-code" maxlength="32" autocomplete="off" placeholder="例如 ABCD-EFGH">
+    <div class="actions">
+        <button id="pair">完成配对</button>
+        <button id="refresh" class="secondary">刷新状态</button>
+    </div>
+    <dl>
+        <div><dt>扩展版本</dt><dd id="version">-</dd></div>
+        <div><dt>BOSS页面</dt><dd id="boss-page">-</dd></div>
+        <div><dt>登录状态</dt><dd id="login-state">-</dd></div>
+        <div><dt>安全状态</dt><dd id="security-state">-</dd></div>
+    </dl>
+    <p class="hint">扩展不会读取或上传 Cookie，不会处理验证码，也不会绕过安全验证。</p>
+</main>
+<script src="popup.js"></script>
+</body>
+</html>

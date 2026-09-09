@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>BOSS 自动投递管理端</title>
-    <link rel="stylesheet" href="/styles.css?v=20260909-2">
+    <link rel="stylesheet" href="/styles.css?v=20260909-4">
 </head>
 <body>
 <main class="page-shell">
@@ -23,6 +23,54 @@
         <p id="system-detail" class="system-detail">正在读取本地浏览器连接和 BOSS 页面状态……</p>
     </section>
 
+    <nav class="module-tabs" role="tablist" aria-label="管理功能切换">
+        <button id="tab-connection" class="module-tab active" type="button" role="tab" aria-selected="true" aria-controls="panel-connection" data-tab-target="connection">连接管理</button>
+        <button id="tab-policy" class="module-tab" type="button" role="tab" aria-selected="false" aria-controls="panel-policy" data-tab-target="policy" tabindex="-1">投递策略</button>
+        <button id="tab-collector" class="module-tab" type="button" role="tab" aria-selected="false" aria-controls="panel-collector" data-tab-target="collector" tabindex="-1">职位采集</button>
+        <button id="tab-queue" class="module-tab" type="button" role="tab" aria-selected="false" aria-controls="panel-queue" data-tab-target="queue" tabindex="-1">候选队列</button>
+        <button id="tab-outsourcing" class="module-tab" type="button" role="tab" aria-selected="false" aria-controls="panel-outsourcing" data-tab-target="outsourcing" tabindex="-1">外包规则</button>
+        <button id="tab-jobs" class="module-tab" type="button" role="tab" aria-selected="false" aria-controls="panel-jobs" data-tab-target="jobs" tabindex="-1">职位记录</button>
+    </nav>
+
+    <div id="panel-connection" class="tab-panel" role="tabpanel" aria-labelledby="tab-connection" data-tab-panel="connection">
+    <section class="card extension-card">
+        <div class="card-heading">
+            <div>
+                <p class="section-label">推荐连接方式</p>
+                <h2>Chrome 扩展连接中心</h2>
+            </div>
+            <span id="extension-state" class="status-pill status-warn">正在检查</span>
+        </div>
+        <p class="helper-text extension-help">扩展只向本机管理端上报 BOSS 标签页、页面类型、登录和安全状态，不上传 Cookie 或完整 DOM。出现访问限制或安全验证时，系统只会停止后续操作并提示人工处理。</p>
+        <div class="extension-layout">
+            <div class="extension-status-grid" aria-label="Chrome 扩展连接状态">
+                <div><span>扩展版本</span><strong id="extension-version">-</strong></div>
+                <div><span>在线状态</span><strong id="extension-online">-</strong></div>
+                <div><span>BOSS 页面</span><strong id="extension-boss-tab">-</strong></div>
+                <div><span>页面脚本</span><strong id="extension-content-script">-</strong></div>
+                <div><span>页面类型</span><strong id="extension-page-type">-</strong></div>
+                <div><span>登录状态</span><strong id="extension-login-state">-</strong></div>
+                <div><span>安全状态</span><strong id="extension-security-state">-</strong></div>
+                <div><span>最近心跳</span><strong id="extension-last-heartbeat">-</strong></div>
+            </div>
+            <div class="pairing-panel">
+                <span class="pairing-label">一次性配对码</span>
+                <strong id="extension-pairing-code" class="pairing-code">尚未生成</strong>
+                <span id="extension-pairing-expiry" class="helper-text compact-help">配对码只在内存中短时有效</span>
+                <ol class="pairing-steps">
+                    <li>在 Chrome 扩展管理页加载 <code>chrome-extension/</code>。</li>
+                    <li>打开扩展弹窗，输入这里生成的配对码。</li>
+                    <li>打开 BOSS 页面并人工登录，等待连接状态变为就绪。</li>
+                </ol>
+            </div>
+        </div>
+        <div class="action-row extension-actions">
+            <button id="start-extension-pairing" class="button primary">生成配对码</button>
+            <button id="refresh-extension-status" class="button secondary">刷新状态</button>
+            <button id="unpair-extension" class="button secondary" disabled>解除配对</button>
+            <span id="extension-message" class="helper-text">正在读取扩展连接状态……</span>
+        </div>
+    </section>
     <section class="card browser-card">
         <div class="card-heading">
             <div>
@@ -41,7 +89,9 @@
             <span class="helper-text">如确有需要，可在启动前显式设置 BOSS_PREVIEW_ENABLED=true；登录和安全验证期间仍不会自动截图。</span>
         </div>
     </section>
+    </div>
 
+    <div id="panel-policy" class="tab-panel" role="tabpanel" aria-labelledby="tab-policy" data-tab-panel="policy" hidden>
     <section class="grid-layout">
         <div class="card policy-card">
             <div class="card-heading">
@@ -85,7 +135,9 @@
             </div>
         </div>
     </section>
+    </div>
 
+    <div id="panel-collector" class="tab-panel" role="tabpanel" aria-labelledby="tab-collector" data-tab-panel="collector" hidden>
     <section class="card collector-card">
         <div class="card-heading">
             <div>
@@ -103,7 +155,9 @@
             <span id="collector-result" class="result-text">等待导入职位快照</span>
         </div>
     </section>
+    </div>
 
+    <div id="panel-queue" class="tab-panel" role="tabpanel" aria-labelledby="tab-queue" data-tab-panel="queue" hidden>
     <section class="card queue-card">
         <div class="card-heading">
             <div>
@@ -132,6 +186,9 @@
             <span class="helper-text">确认只批准所选岗位，之后仍需逐条点击“准备单条投递”。</span>
         </div>
     </section>
+    </div>
+
+    <div id="panel-outsourcing" class="tab-panel" role="tabpanel" aria-labelledby="tab-outsourcing" data-tab-panel="outsourcing" hidden>
     <section class="card outsourcing-card">
         <div class="card-heading">
             <div>
@@ -188,6 +245,9 @@
             <span id="outsourcing-result" class="result-text">填写信息后可预览识别结果</span>
         </div>
     </section>
+    </div>
+
+    <div id="panel-jobs" class="tab-panel" role="tabpanel" aria-labelledby="tab-jobs" data-tab-panel="jobs" hidden>
     <section class="card jobs-card">
         <div class="card-heading">
             <div>
@@ -200,15 +260,20 @@
             <p class="empty-state">暂无职位记录，请先导入职位快照，或由浏览器连接器写入此处。</p>
         </div>
     </section>
+    </div>
 
     <footer>
         <span>本地服务地址：<code>http://localhost:18080</code></span>
         <span>策略、职位和候选队列保存于本地 SQLite，重启后保留</span>
     </footer>
 </main>
-<script src="/app.js?v=20260909-2"></script>
+<script src="/api.js?v=20260909-4"></script>
+<script src="/app.js?v=20260909-4"></script>
+<script src="/modules/connection.js?v=20260909-4"></script>
 </body>
 </html>
+
+
 
 
 

@@ -20,6 +20,12 @@ app:
     max-request-body-bytes: ${BOSS_MAX_REQUEST_BODY_BYTES:1048576}
     # 人工确认令牌只在内存中短时有效，使用后立即失效。
     confirmation-token-ttl-seconds: ${BOSS_CONFIRMATION_TOKEN_TTL_SECONDS:60}
+  extension:
+    # 扩展首次配对使用一次性短期配对码，长期令牌只在扩展本地保存。
+    pairing-ttl-seconds: ${BOSS_EXTENSION_PAIRING_TTL_SECONDS:300}
+    # 心跳只上报结构化状态，不读取或上传 Cookie 和完整 DOM。
+    heartbeat-interval-seconds: ${BOSS_EXTENSION_HEARTBEAT_INTERVAL_SECONDS:30}
+    heartbeat-timeout-seconds: ${BOSS_EXTENSION_HEARTBEAT_TIMEOUT_SECONDS:75}
   database:
     path: runtime/boss-auto-apply.db
   browser:
@@ -38,5 +44,6 @@ app:
       session-root: runtime/browser-sessions
       # 单次只采集当前页已加载职位，避免高频翻页和触发风控。
       max-jobs-per-collect: 50
+
 
 

@@ -48,7 +48,9 @@ public class AdminAccessFilter extends OncePerRequestFilter {
             "/api/filter/rules",
             "/api/queue/rebuild",
             "/api/queue/confirm",
-            "/api/queue/confirmation-token"
+            "/api/queue/confirmation-token",
+            "/api/extension/pairing/start",
+            "/api/extension/unpair"
     );
 
     private final AppSecurityProperties securityProperties;
@@ -57,6 +59,12 @@ public class AdminAccessFilter extends OncePerRequestFilter {
 
     public AdminAccessFilter(AppSecurityProperties securityProperties) {
         this.securityProperties = securityProperties;
+    }
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        // 扩展客户端使用独立来源和独立令牌，由 ExtensionAccessFilter 单独保护。
+        return request.getRequestURI().startsWith("/api/extension/client/");
     }
 
     @Override
@@ -301,4 +309,5 @@ public class AdminAccessFilter extends OncePerRequestFilter {
         }
     }
 }
+
 

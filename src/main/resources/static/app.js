@@ -13,43 +13,51 @@ const outsourcingFieldOptions = [
 ];
 const $ = (id) => document.getElementById(id);
 
-const adminTokenKey = "boss-auto-apply-admin-token";
+const {secureFetch, requestJson} = window.BossApi;
 
-// 管理令牌只保存在当前标签页会话中，关闭标签页后自动清除。
-function securityHeaders(headers = {}) {
-    const token = sessionStorage.getItem(adminTokenKey);
-    return {
-        "Content-Type": "application/json",
-        "X-Boss-Requested-With": "BossAutoApply",
-        ...(token ? {"X-Boss-Admin-Token": token} : {}),
-        ...headers
-    };
+const activeTabStorageKey = "boss-auto-apply-active-tab";
+
+// 统一切换主功能面板，并在当前标签页会话中记住用户选择。
+function activateTab(tabName, shouldFocus = false) {
+    const tabs = Array.from(document.querySelectorAll("[data-tab-target]"));
+    const panels = Array.from(document.querySelectorAll("[data-tab-panel]"));
+    const targetTab = tabs.find((tab) => tab.dataset.tabTarget === tabName) || tabs[0];
+    if (!targetTab) return;
+
+    const activeName = targetTab.dataset.tabTarget;
+    tabs.forEach((tab) => {
+        const active = tab === targetTab;
+        tab.classList.toggle("active", active);
+        tab.setAttribute("aria-selected", String(active));
+        tab.tabIndex = active ? 0 : -1;
+    });
+    panels.forEach((panel) => {
+        panel.hidden = panel.dataset.tabPanel !== activeName;
+    });
+    sessionStorage.setItem(activeTabStorageKey, activeName);
+    if (shouldFocus) targetTab.focus();
 }
 
-async function secureFetch(url, options = {}) {
-    return fetch(url, {...options, headers: securityHeaders(options.headers || {})});
-}
+// 支持鼠标、触摸和方向键切换，避免 Tab 导航只能用鼠标操作。
+function initTabs() {
+    const tabs = Array.from(document.querySelectorAll("[data-tab-target]"));
+    if (tabs.length === 0) return;
 
-async function requestJson(url, options = {}, retried = false) {
-    const response = await secureFetch(url, options);
-    const text = await response.text();
-    let data = {};
-    if (text) {
-        try {
-            data = JSON.parse(text);
-        } catch (error) {
-            data = {message: text};
-        }
-    }
-    if (response.status === 401 && data.code === "ADMIN_TOKEN_REQUIRED" && !retried) {
-        const token = window.prompt("当前通过局域网访问，请输入本地管理端令牌：");
-        if (token && token.trim()) {
-            sessionStorage.setItem(adminTokenKey, token.trim());
-            return requestJson(url, options, true);
-        }
-    }
-    if (!response.ok) throw new Error(data.message || "请求失败");
-    return data;
+    tabs.forEach((tab, index) => {
+        tab.addEventListener("click", () => activateTab(tab.dataset.tabTarget));
+        tab.addEventListener("keydown", (event) => {
+            let targetIndex = null;
+            if (event.key === "ArrowRight") targetIndex = (index + 1) % tabs.length;
+            if (event.key === "ArrowLeft") targetIndex = (index - 1 + tabs.length) % tabs.length;
+            if (event.key === "Home") targetIndex = 0;
+            if (event.key === "End") targetIndex = tabs.length - 1;
+            if (targetIndex === null) return;
+            event.preventDefault();
+            activateTab(tabs[targetIndex].dataset.tabTarget, true);
+        });
+    });
+
+    activateTab(sessionStorage.getItem(activeTabStorageKey) || tabs[0].dataset.tabTarget);
 }
 
 function escapeHtml(value) {
@@ -651,10 +659,12 @@ $("refresh-browser-preview").addEventListener("click", async () => {
 $("start-embedded-browser").addEventListener("click", startEmbeddedBrowser);
 $("stop-embedded-browser").addEventListener("click", stopEmbeddedBrowser);
 $("start-embedded-collector").addEventListener("click", collectFromEmbeddedBrowser);
+initTabs();
 init().catch((error) => {
     $("policy-message").textContent = error.message;
     $("system-detail").textContent = "本地服务尚未准备好，请确认 18080 端口已启动。";
 });
+
 
 
 

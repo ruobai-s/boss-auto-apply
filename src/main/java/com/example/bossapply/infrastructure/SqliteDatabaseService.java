@@ -121,6 +121,23 @@ public class SqliteDatabaseService {
                         )
                         """);
                 statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_delivery_queue_date_status ON delivery_queue(planned_date, queue_status)");
+                statement.executeUpdate("""
+                        CREATE TABLE IF NOT EXISTS extension_client (
+                            id INTEGER PRIMARY KEY CHECK (id = 1),
+                            extension_id TEXT NOT NULL,
+                            instance_id TEXT NOT NULL,
+                            token_hash TEXT NOT NULL,
+                            extension_version TEXT NOT NULL,
+                            boss_tab_found INTEGER NOT NULL DEFAULT 0,
+                            content_script_ready INTEGER NOT NULL DEFAULT 0,
+                            page_type TEXT NOT NULL DEFAULT 'NONE',
+                            login_state TEXT NOT NULL DEFAULT 'UNKNOWN',
+                            security_state TEXT NOT NULL DEFAULT 'UNKNOWN',
+                            status_message TEXT NOT NULL DEFAULT '',
+                            paired_at TEXT NOT NULL,
+                            last_heartbeat_at TEXT
+                        )
+                        """);
             }
         } catch (IOException | ClassNotFoundException | SQLException exception) {
             throw new IllegalStateException("SQLite 数据库初始化失败：" + databasePath, exception);

@@ -24,6 +24,15 @@ public class ApiExceptionHandler {
     }
 
     /**
+     * 处理扩展实例或令牌不匹配。
+     */
+    @ExceptionHandler(SecurityException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public Map<String, String> handleSecurity(SecurityException exception) {
+        return Map.of("message", exception.getMessage());
+    }
+
+    /**
      * 处理请求字段校验错误。
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -36,3 +45,4 @@ public class ApiExceptionHandler {
         return Map.of("message", message);
     }
 }
+

@@ -164,6 +164,18 @@ class AdminAccessFilterTest {
         assertEquals(true, lastResponse.getHeader("Retry-After") != null);
     }
 
+    @Test
+    void shouldLeaveExtensionClientPathToDedicatedFilter() throws Exception {
+        AppSecurityProperties properties = new AppSecurityProperties();
+        AdminAccessFilter filter = new AdminAccessFilter(properties);
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/extension/client/heartbeat");
+        request.setRemoteAddr("127.0.0.1");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, new MockFilterChain());
+
+        assertEquals(200, response.getStatus());
+    }
     private MockHttpServletRequest request(String method, String remoteAddress) {
         MockHttpServletRequest request = new MockHttpServletRequest(method, "/api/system/status");
         request.setRemoteAddr(remoteAddress);
@@ -173,3 +185,4 @@ class AdminAccessFilterTest {
         return request;
     }
 }
+
