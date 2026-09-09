@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>BOSS 自动投递管理端</title>
+    <link rel="stylesheet" href="/styles.css?v=20260909-2">
+</head>
+<body>
+<main class="page-shell">
+    <header class="topbar">
+        <div>
+            <p class="eyebrow">LOCAL JOB ASSISTANT</p>
+            <h1>BOSS 自动投递管理端</h1>
+            <p class="subtitle">本地运行 · 手机电脑均可访问 · 外包公司自动排除</p>
+        </div>
+        <div class="status-actions"><span id="system-status" class="status-pill status-warn">浏览器待连接</span><button id="start-embedded-browser" class="button primary compact">启动独立 Edge</button><button id="stop-embedded-browser" class="button secondary compact">停止独立 Edge</button><button id="refresh-system" class="button secondary compact">刷新状态</button><button id="connect-embedded-browser" class="button secondary compact">登录后建立连接</button></div>
+    </header>
+
+    <section class="notice">
+        <strong>当前为本地数据 MVP</strong>
+        <span>先采集和筛选，再由你逐条确认；本地服务不会批量点击投递，也不保存密码、验证码或 Cookie。</span>
+        <p id="system-detail" class="system-detail">正在读取本地浏览器连接和 BOSS 页面状态……</p>
+    </section>
+
+    <section class="card browser-card">
+        <div class="card-heading">
+            <div>
+                <p class="section-label">受支持浏览器连接器</p>
+                <h2>独立 Edge 登录与预览</h2>
+            </div>
+            <span class="tag safe-tag">独立临时会话</span>
+        </div>
+        <p class="helper-text browser-help">系统先启动普通 Edge 独立进程，登录期间不会建立自动化连接。请在该窗口中人工登录，完成后再点击“登录后建立连接”；停止后会删除本次临时浏览器会话。管理端默认仅允许本机访问；局域网访问必须配置独立管理令牌。</p>
+        <div class="browser-preview-shell">
+            <div id="browser-preview-empty" class="empty-state">页面预览默认关闭，避免泄露账号和职位信息。</div>
+            <img id="browser-preview" class="browser-preview" alt="独立 Edge 当前页面预览" hidden>
+        </div>
+        <div class="action-row">
+            <button id="refresh-browser-preview" class="button secondary">刷新页面预览</button>
+            <span class="helper-text">如确有需要，可在启动前显式设置 BOSS_PREVIEW_ENABLED=true；登录和安全验证期间仍不会自动截图。</span>
+        </div>
+    </section>
+
+    <section class="grid-layout">
+        <div class="card policy-card">
+            <div class="card-heading">
+                <div>
+                    <p class="section-label">投递策略</p>
+                    <h2>优先城市与每日额度</h2>
+                </div>
+                <span class="quota-badge">上限 150 / 天</span>
+            </div>
+            <div class="form-row">
+                <label for="daily-total">每日总投递数</label>
+                <input id="daily-total" type="number" min="1" max="150" value="150">
+            </div>
+            <div id="city-list" class="city-list"></div>
+            <div class="ratio-summary">
+                <span>当前比例合计</span>
+                <strong id="ratio-total">100%</strong>
+            </div>
+            <div class="action-row">
+                <button id="add-city" class="button secondary">添加城市</button>
+                <button id="preview-policy" class="button primary">预览额度</button>
+                <button id="save-policy" class="button success">保存策略</button>
+            </div>
+            <p id="policy-message" class="helper-text"></p>
+        </div>
+
+        <div class="card dashboard-card">
+            <div class="card-heading">
+                <div>
+                    <p class="section-label">今日进度</p>
+                    <h2>投递额度概览</h2>
+                </div>
+                <span class="muted">本地记录</span>
+            </div>
+            <div id="quota-list" class="quota-list"></div>
+            <div class="metric-grid">
+                <div class="metric"><span>每日计划</span><strong id="metric-total">150</strong></div>
+                <div class="metric"><span>外包排除</span><strong id="metric-excluded" class="danger">0</strong></div>
+                <div class="metric"><span>待人工复核</span><strong id="metric-review" class="warning">0</strong></div>
+                <div class="metric"><span>成功投递</span><strong id="metric-applied" class="success-text">0</strong></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="card collector-card">
+        <div class="card-heading">
+            <div>
+                <p class="section-label">BOSS 职位采集</p>
+                <h2>导入职位快照并筛选</h2>
+            </div>
+            <span class="tag safe-tag">只采集 · 不投递</span>
+        </div>
+        <p class="helper-text collector-help">先启动独立 Edge，在弹出的独立窗口中手动登录 BOSS 并打开职位列表；回到管理端点击“登录后建立连接”，连接成功后再点击“从独立 Edge 采集”。系统只读取当前页已加载职位，不翻页、不处理验证码、不点击投递按钮。</p>
+        <textarea id="jobs-json" rows="9" placeholder='{"capturedAt":"2026-09-07T15:00:00+08:00","jobs":[{"source":"BOSS","sourceJobId":"job-001","companyName":"示例科技","companyIntroduction":"软件产品研发","jobName":"Java开发","jobDescription":"负责后端接口开发","city":"北京","salary":"20-30K","jobUrl":"https://www.zhipin.com/job_detail/example.html","publishedAt":"2026-09-07"}]}'></textarea>
+        <div class="action-row">
+            <button id="start-embedded-collector" class="button primary">从独立 Edge 采集</button>
+            <button id="load-sample" class="button secondary">填入示例</button>
+            <button id="collect-jobs" class="button secondary">导入并筛选</button>
+            <span id="collector-result" class="result-text">等待导入职位快照</span>
+        </div>
+    </section>
+
+    <section class="card queue-card">
+        <div class="card-heading">
+            <div>
+                <p class="section-label">候选岗位队列</p>
+                <h2>按城市额度生成待确认列表</h2>
+            </div>
+            <span class="tag safe-tag">人工确认前不投递</span>
+        </div>
+        <div class="queue-toolbar">
+            <div>
+                <label for="planned-date">计划日期</label>
+                <input id="planned-date" type="date">
+            </div>
+            <div class="action-row queue-actions">
+                <button id="rebuild-queue" class="button primary">生成候选队列</button>
+                <button id="refresh-queue" class="button secondary">刷新队列</button>
+            </div>
+        </div>
+        <p id="queue-message" class="helper-text">城市岗位不足时，会按允许调剂策略生成补量候选；外包和疑似外包职位不会自动进入队列。</p>
+        <div class="queue-summary"><span>当前列表</span><strong id="queue-count">0 个</strong></div>
+        <div id="queue-list" class="queue-list">
+            <p class="empty-state">还没有生成今日候选队列。</p>
+        </div>
+        <div class="action-row queue-confirm-row">
+            <button id="confirm-queue" class="button success">确认所选职位</button>
+            <span class="helper-text">确认只批准所选岗位，之后仍需逐条点击“准备单条投递”。</span>
+        </div>
+    </section>
+    <section class="card outsourcing-card">
+        <div class="card-heading">
+            <div>
+                <p class="section-label">规则管理与预览</p>
+                <h2>外包公司自动排除</h2>
+            </div>
+            <span class="tag danger-tag">支持多个公司和条件</span>
+        </div>
+        <p class="helper-text rule-help">公司名单按完整名称匹配；自定义条件按列表顺序判断，任意一条命中后执行“自动排除”或“人工复核”。内置外包关键词仍会继续生效。</p>
+        <div class="rule-config-grid">
+            <div class="rule-panel">
+                <label for="excluded-companies">公司排除名单（每行一个）</label>
+                <textarea id="excluded-companies" class="rule-textarea" rows="7" placeholder="例如：&#10;某某人力资源有限公司&#10;某某软件外包有限公司"></textarea>
+                <span class="helper-text compact-help">最多 100 家，空行和重复公司会自动忽略。</span>
+            </div>
+            <div class="rule-panel">
+                <div class="rule-panel-heading">
+                    <div>
+                        <strong>自定义条件</strong>
+                        <span>最多 100 条，当前为任意一条命中。</span>
+                    </div>
+                    <button id="add-outsourcing-condition" class="button secondary compact" type="button">添加条件</button>
+                </div>
+                <div id="outsourcing-condition-list" class="condition-list">
+                    <p class="empty-state">暂无自定义条件。</p>
+                </div>
+            </div>
+        </div>
+        <div class="action-row rule-save-row">
+            <button id="save-outsourcing-rules" class="button success">保存外包规则</button>
+            <span id="outsourcing-rule-message" class="helper-text">保存后会重新检查本地职位，并撤销不再安全的待确认队列项。</span>
+        </div>
+        <div class="rule-preview-divider"><span>单个职位规则测试</span></div>
+        <div class="filter-grid preview-filter-grid">
+            <div>
+                <label for="company-name">公司名称</label>
+                <input id="company-name" placeholder="例如：示例科技">
+            </div>
+            <div>
+                <label for="company-intro">公司简介</label>
+                <input id="company-intro" placeholder="例如：软件研发、IT外包服务">
+            </div>
+            <div>
+                <label for="job-name">职位名称</label>
+                <input id="job-name" placeholder="例如：Java 开发工程师">
+            </div>
+            <div>
+                <label for="job-description">职位描述</label>
+                <input id="job-description" placeholder="例如：需要驻场客户现场办公">
+            </div>
+        </div>
+        <div class="action-row">
+            <button id="check-outsourcing" class="button primary">检查外包风险</button>
+            <span id="outsourcing-result" class="result-text">填写信息后可预览识别结果</span>
+        </div>
+    </section>
+    <section class="card jobs-card">
+        <div class="card-heading">
+            <div>
+                <p class="section-label">本地职位库</p>
+                <h2>最近采集记录</h2>
+            </div>
+            <button id="refresh-jobs" class="button secondary">刷新记录</button>
+        </div>
+        <div id="job-list" class="job-list">
+            <p class="empty-state">暂无职位记录，请先导入职位快照，或由浏览器连接器写入此处。</p>
+        </div>
+    </section>
+
+    <footer>
+        <span>本地服务地址：<code>http://localhost:18080</code></span>
+        <span>策略、职位和候选队列保存于本地 SQLite，重启后保留</span>
+    </footer>
+</main>
+<script src="/app.js?v=20260909-2"></script>
+</body>
+</html>
+
+
+
+
+
+
+

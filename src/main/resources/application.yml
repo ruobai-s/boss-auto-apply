@@ -1,0 +1,42 @@
+server:
+  port: 18080
+  # 默认仅允许本机访问；手机访问必须显式设置 SERVER_ADDRESS=0.0.0.0 并配置安全令牌。
+  address: ${SERVER_ADDRESS:127.0.0.1}
+  max-http-request-header-size: 16KB
+spring:
+  application:
+    name: boss-auto-apply
+app:
+  security:
+    # 局域网访问默认关闭，开启时必须同时配置 BOSS_ADMIN_TOKEN。
+    allow-lan: ${BOSS_ALLOW_LAN:false}
+    admin-token: ${BOSS_ADMIN_TOKEN:}
+    # 页面截图可能包含个人信息，默认关闭。
+    preview-enabled: ${BOSS_PREVIEW_ENABLED:false}
+    # 普通状态查询允许较高频率，敏感操作使用更严格的独立限额。
+    requests-per-minute: ${BOSS_REQUESTS_PER_MINUTE:120}
+    sensitive-requests-per-minute: ${BOSS_SENSITIVE_REQUESTS_PER_MINUTE:20}
+    # 在 JSON 反序列化前限制请求体，避免超大或分块请求耗尽本机内存。
+    max-request-body-bytes: ${BOSS_MAX_REQUEST_BODY_BYTES:1048576}
+    # 人工确认令牌只在内存中短时有效，使用后立即失效。
+    confirmation-token-ttl-seconds: ${BOSS_CONFIRMATION_TOKEN_TTL_SECONDS:60}
+  database:
+    path: runtime/boss-auto-apply.db
+  browser:
+    # 兼容已有外部调试端点，只读探测，不保存浏览器凭据。
+    cdp-url: http://127.0.0.1:9222
+    embedded:
+      # 使用本机安装的普通 Edge 进程；登录完成前不会建立 Playwright 连接。
+      channel: msedge
+      executable-path:
+      # 直接进入求职职位页，避免首页 SEO/安全检查跳转导致临时页面被清空。
+      start-url: https://www.zhipin.com/web/geek/jobs?ka=header-jobs
+      navigation-timeout-ms: 20000
+      # 普通 Edge 启动后等待本地 CDP 端点就绪的最长时间。
+      cdp-startup-timeout-ms: 10000
+      # 浏览器运行期间使用独立临时会话，停止后自动删除。
+      session-root: runtime/browser-sessions
+      # 单次只采集当前页已加载职位，避免高频翻页和触发风控。
+      max-jobs-per-collect: 50
+
+
