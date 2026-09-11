@@ -1,6 +1,5 @@
 let policy = null;
 let currentQueue = [];
-let embeddedStatusTimer = null;
 let outsourcingRuleConfig = {excludedCompanies: [], conditions: []};
 const maxCities = 5;
 const maxOutsourcingRules = 100;
@@ -13,7 +12,7 @@ const outsourcingFieldOptions = [
 ];
 const $ = (id) => document.getElementById(id);
 
-const {secureFetch, requestJson} = window.BossApi;
+const {requestJson} = window.BossApi;
 
 const activeTabStorageKey = "boss-auto-apply-active-tab";
 
@@ -35,6 +34,9 @@ function activateTab(tabName, shouldFocus = false) {
         panel.hidden = panel.dataset.tabPanel !== activeName;
     });
     sessionStorage.setItem(activeTabStorageKey, activeName);
+    if (activeName === "delivery") {
+        loadDeliveryTasks().catch(() => {});
+    }
     if (shouldFocus) targetTab.focus();
 }
 
@@ -292,20 +294,6 @@ function statusClass(status) {
     return "job-status";
 }
 
-// 将连接器状态转换为用户可执行的处理提示，不展示敏感页面内容。
-function embeddedStatusHint(embedded) {
-    const hints = {
-        BROWSER_DISCONNECTED: "浏览器进程已断开，请重新启动连接器。",
-        PAGE_UNAVAILABLE: "BOSS 页面不可用，请检查 Edge 窗口；系统不会自动刷新或反复重启。",
-        SECURITY_CHECK_REQUIRED: "BOSS 页面可能触发安全验证，请在 Edge 窗口中人工处理后再继续。",
-        WRONG_PAGE: "请在 Edge 窗口中回到 BOSS 职位列表页面。",
-        STARTED_NEEDS_LOGIN: "请在 Edge 窗口中手动完成 BOSS 登录，完成后点击“登录后建立连接”。",
-        READY: "已检测到登录，可进行只读职位采集。",
-        CONNECTED: "连接已建立，可进行只读职位采集。"
-    };
-    return hints[embedded.state] || embedded.message || "";
-}
-
 async function loadJobs() {
     const page = await requestJson("/api/jobs?page=0&size=50");
     const jobs = page.items || [];
@@ -320,11 +308,23 @@ async function loadJobs() {
     }
     list.innerHTML = jobs.slice(0, 20).map((job) => {
         const jobUrl = safeHttpUrl(job.jobUrl);
+        const details = [
+            job.experienceRequirement ? `经验：${job.experienceRequirement}` : "",
+            job.educationRequirement ? `学历：${job.educationRequirement}` : "",
+            job.companySize ? `规模：${job.companySize}` : "",
+            job.companyIndustry ? `行业：${job.companyIndustry}` : "",
+            job.publishedAt ? `时间：${job.publishedAt}` : ""
+        ].filter(Boolean);
+        const stateTags = [job.urgent === true ? "急招" : "", job.online === true ? "在线" : ""].filter(Boolean);
+        const collectedTags = [...(job.jobTags || []), ...(job.welfareTags || []), ...stateTags];
         return `
         <article class="job-item">
             <div class="job-main">
                 <strong>${escapeHtml(job.jobName || "未命名职位")}</strong>
                 <span>${escapeHtml(job.companyName || "未知公司")} · ${escapeHtml(job.city || "城市未知")} · ${escapeHtml(job.salary || "薪资面议")}</span>
+                ${details.length ? `<div class="job-collected-fields">${details.map((detail) => `<span>${escapeHtml(detail)}</span>`).join("")}</div>` : ""}
+                ${collectedTags.length ? `<div class="job-collected-tags">${collectedTags.slice(0, 12).map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}</div>` : ""}
+                ${job.jobDescription ? `<small class="job-description-preview">职位描述：${escapeHtml(job.jobDescription)}</small>` : ""}
                 <small>${escapeHtml(job.outsourcingReason || "未执行外包判断")}${job.outsourcingKeyword ? ` · 命中：${escapeHtml(job.outsourcingKeyword)}` : ""}</small>
                 ${jobUrl ? `<a href="${escapeHtml(jobUrl)}" target="_blank" rel="noopener noreferrer">查看 BOSS 职位详情</a>` : ""}
             </div>
@@ -334,7 +334,30 @@ async function loadJobs() {
 }
 
 function queueStatusLabel(status) {
-    return {QUEUED: "待人工确认", APPROVED: "已确认", REJECTED: "已拒绝", APPLIED: "已投递"}[status] || status;
+    return {QUEUED: "待人工确认", APPROVED: "已确认（已进入投递任务）", REJECTED: "已拒绝", APPLIED: "已投递"}[status] || status;
+}
+
+function deliveryTaskStatusLabel(status) {
+    return {WAITING: "等待扩展领取", RUNNING: "扩展执行中", COMPLETED: "已完成", BLOCKED: "已阻断，需人工处理"}[status] || status;
+}
+
+async function loadDeliveryTasks() {
+    const plannedDate = $("planned-date").value || localDateString();
+    const tasks = await requestJson(`/api/delivery-tasks?plannedDate=${encodeURIComponent(plannedDate)}`);
+    const list = $("delivery-task-list");
+    if (!tasks.length) {
+        list.innerHTML = '<p class="empty-state">确认候选岗位后，投递任务会自动出现在这里。</p>';
+        return;
+    }
+    list.innerHTML = tasks.slice(0, 5).map((task) => `
+        <article class="queue-item">
+            <div class="queue-item-main">
+                <strong>${escapeHtml(task.taskName || "投递任务")}</strong>
+                <small>${escapeHtml(deliveryTaskStatusLabel(task.taskStatus))} · 共 ${task.totalCount} 个 · 待处理 ${task.waitingCount} 个</small>
+                <small>成功 ${task.successCount} · 失败 ${task.failedCount} · 未知 ${task.unknownCount}</small>
+            </div>
+            <span class="queue-state">${escapeHtml(task.updatedAt || task.createdAt || "")}</span>
+        </article>`).join("");
 }
 
 function renderQueue(items) {
@@ -351,8 +374,6 @@ function renderQueue(items) {
         const selector = item.queueStatus === "QUEUED"
             ? `<label class="queue-check"><input type="checkbox" data-queue-id="${item.queueId}"> 选择</label>`
             : `<span class="queue-state">${escapeHtml(queueStatusLabel(item.queueStatus))}</span>`;
-        const applyAction = item.queueStatus === "APPROVED"
-            ? `<button class="button secondary compact" data-prepare-apply="${item.queueId}">准备单条投递</button>` : "";
         return `<article class="queue-item">
             <div class="queue-item-main">
                 <div class="queue-item-title"><strong>${escapeHtml(job.jobName || "未命名职位")}</strong><span class="queue-rank">#${item.queueRank}</span></div>
@@ -360,14 +381,10 @@ function renderQueue(items) {
                 <small>计划城市：${escapeHtml(item.quotaCity)} · ${item.allocationType === "TRANSFER" ? "补量候选" : "主额度"} · ${escapeHtml(job.outsourcingReason || "已通过外包筛选")}</small>
                 ${jobUrl ? `<a href="${escapeHtml(jobUrl)}" target="_blank" rel="noopener noreferrer">查看职位详情</a>` : ""}
             </div>
-            <div class="queue-item-actions">${selector}${applyAction}</div>
+            <div class="queue-item-actions">${selector}</div>
         </article>`;
     }).join("");
-    list.querySelectorAll("[data-prepare-apply]").forEach((button) => button.addEventListener("click", () => {
-        prepareSingleApply(Number(button.dataset.prepareApply)).catch((error) => {
-            $("queue-message").textContent = error.message;
-        });
-    }));
+
 }
 
 function selectedQueueIds() {
@@ -378,6 +395,9 @@ async function loadQueue() {
     const plannedDate = $("planned-date").value || localDateString();
     const items = await requestJson(`/api/queue?plannedDate=${encodeURIComponent(plannedDate)}`);
     renderQueue(items);
+    await loadDeliveryTasks().catch((error) => {
+        $("queue-message").textContent = `候选队列已加载，但投递任务状态读取失败：${error.message}`;
+    });
 }
 
 async function rebuildQueue() {
@@ -397,7 +417,7 @@ async function confirmQueue() {
         $("queue-message").textContent = "请至少选择一个待人工确认岗位。";
         return;
     }
-    if (!window.confirm(`确定确认 ${ids.length} 个岗位吗？确认后仍需要逐条准备投递。`)) return;
+    if (!window.confirm(`确定确认 ${ids.length} 个岗位吗？确认后将自动创建投递任务，由 Chrome 扩展后台按顺序执行。`)) return;
     try {
         const confirmation = await requestJson("/api/queue/confirmation-token", {
             method: "POST",
@@ -408,92 +428,123 @@ async function confirmQueue() {
             body: JSON.stringify({queueIds: ids, confirm: true, confirmationToken: confirmation.token})
         });
         await loadQueue();
-        $("queue-message").textContent = "人工确认已保存；系统仍不会批量投递。";
+        $("queue-message").textContent = "候选岗位已确认，已自动创建投递任务；Chrome 扩展会在后台按顺序执行。";
+        // 确认完成后直接展示任务管理，避免用户再次手动查找已创建的任务。
+        activateTab("delivery");
     } catch (error) {
         $("queue-message").textContent = error.message;
     }
 }
 
-async function prepareSingleApply(queueId) {
-    if (!window.confirm("确认准备这一条投递吗？系统会在已连接 Edge 的当前页面打开职位详情，不新开标签页，也不会代替你点击投递。")) return;
-    const confirmation = await requestJson(`/api/applications/${queueId}/confirmation-token`, {
-        method: "POST"
-    });
-    const result = await requestJson(`/api/applications/${queueId}/apply`, {
-        method: "POST",
-        body: JSON.stringify({confirm: true, confirmationToken: confirmation.token})
-    });
-    $("queue-message").textContent = result.message;
+
+function isChromeExtensionPageAvailable() {
+    return Boolean(globalThis.chrome?.runtime?.sendMessage);
 }
 
-async function collectFromEmbeddedBrowser() {
-    const view = $("collector-result");
-    view.className = "result-text";
-    view.textContent = "正在读取独立 Edge 当前职位列表……";
+function chromePageUnavailableMessage() {
+    return "当前管理页面不在安装扩展的 Chrome 中，无法直接调用扩展。请把管理端地址复制到普通 Chrome 打开，或在 Chrome 工具栏扩展弹窗中点击“采集当前职位页”。";
+}
+
+function sendChromeExtensionBridgeMessage(message, timeoutMs = 2500) {
+    return new Promise((resolve, reject) => {
+        const requestId = String(Date.now()) + "-" + Math.random().toString(16).slice(2);
+        const targetOrigin = window.location.origin;
+        let timer;
+        const onMessage = (event) => {
+            if (event.source !== window || event.origin !== targetOrigin) return;
+            const data = event.data || {};
+            if (data.source !== "BOSS_LOCAL_ADMIN_BRIDGE" || data.requestId !== requestId) return;
+            window.removeEventListener("message", onMessage);
+            window.clearTimeout(timer);
+            if (data.response?.error) reject(new Error(data.response.error));
+            else resolve(data.response || {});
+        };
+        window.addEventListener("message", onMessage);
+        timer = window.setTimeout(() => {
+            window.removeEventListener("message", onMessage);
+            reject(new Error("未检测到 Chrome 扩展桥接。请确认已在 Chrome 重新加载扩展，并刷新管理页面。"));
+        }, timeoutMs);
+        window.postMessage({source: "BOSS_LOCAL_ADMIN_BRIDGE", requestId, type: message.type, payload: message}, targetOrigin);
+    });
+}
+
+function sendChromeExtensionMessage(extensionId, message, timeoutMs = 2500) {
+    if (!isChromeExtensionPageAvailable()) {
+        return sendChromeExtensionBridgeMessage(message, timeoutMs);
+    }
+    return new Promise((resolve, reject) => {
+        const timer = window.setTimeout(() => reject(new Error("Chrome 扩展自动投递超时，请检查 BOSS 页面状态。")), timeoutMs);
+        chrome.runtime.sendMessage(extensionId, message, (response) => {
+            window.clearTimeout(timer);
+            const runtimeError = chrome.runtime.lastError;
+            if (runtimeError) {
+                reject(new Error("Chrome 扩展未响应。请确认扩展已加载、管理端地址已在 Chrome 打开，并刷新管理页面。"));
+                return;
+            }
+            if (response?.error) {
+                reject(new Error(response.error));
+                return;
+            }
+            resolve(response || {});
+        });
+    });
+}
+
+async function updateChromeCollectionGuide() {
+    const guide = $("chrome-collection-guide");
+    if (!guide) return;
+    if (isChromeExtensionPageAvailable()) {
+        guide.hidden = true;
+        return;
+    }
     try {
-        const result = await requestJson("/api/browser/embedded/collect", {method: "POST"});
-        if (result.persisted) {
-            const saved = result.persisted;
-            view.className = "result-text result-normal";
-            view.textContent = `独立 Edge 采集 ${result.jobsFound} 个，新增 ${saved.newJobs} 个，重复 ${saved.duplicates} 个，排除外包 ${saved.excluded} 个，待复核 ${saved.manualReview} 个。`;
-            await loadJobs();
-        } else {
-            view.className = "result-text result-danger";
-            view.textContent = result.message;
+        await sendChromeExtensionBridgeMessage({type: "GET_EXTENSION_STATUS"}, 1200);
+        guide.hidden = true;
+    } catch (error) {
+        guide.hidden = false;
+    }
+}
+
+async function copyManagementUrl() {
+    const url = window.location.href;
+    try {
+        await navigator.clipboard.writeText(url);
+        $("collector-result").className = "result-text result-normal";
+        $("collector-result").textContent = "已复制管理端地址：" + url;
+    } catch (error) {
+        window.prompt("请复制下面的管理端地址并在 Chrome 中打开", url);
+    }
+}
+
+function showCollectionSteps() {
+    alert("操作步骤：\n1. 打开普通 Chrome，并访问 http://127.0.0.1:18080/；\n2. 确认已加载 BOSS 本地投递助手扩展；\n3. 打开 BOSS 职位列表并确认扩展显示“已连接、已登录、正常”；\n4. 回到管理端点击“从 Chrome 当前页采集”，或直接在扩展弹窗点击“采集当前职位页”。");
+}
+
+async function collectFromChrome() {
+    const view = $("collector-result");
+    const button = $("collect-from-chrome");
+    view.className = "result-text";
+    button.disabled = true;
+    try {
+        if (!isChromeExtensionPageAvailable()) {
+            throw new Error(chromePageUnavailableMessage());
         }
-        await loadSystemStatus();
+        view.textContent = "正在通过 Chrome 扩展只读采集当前职位列表或详情……";
+        const status = await requestJson("/api/extension/status", {cache: "no-store"});
+        if (!status.extensionId) throw new Error("Chrome 扩展尚未配对，请先在连接管理中完成配对");
+        const result = await sendChromeExtensionMessage(status.extensionId, {type: "COLLECT_CURRENT_BOSS_PAGE"});
+        view.className = "result-text result-normal";
+        view.textContent = result.pageType === "JOB_DETAIL"
+            ? `已补充当前职位详情，新增 ${result.newJobs} 个，更新 ${result.duplicates} 个。`
+            : `Chrome 页面识别 ${result.pageJobsFound} 个，提交 ${result.received} 个，新增 ${result.newJobs} 个，重复 ${result.duplicates} 个，排除外包 ${result.excluded} 个，待复核 ${result.manualReview} 个。`;
+        await loadJobs();
     } catch (error) {
         view.className = "result-text result-danger";
         view.textContent = error.message;
-    }
-}
-
-async function startEmbeddedBrowser() {
-    const detail = $("system-detail");
-    detail.textContent = "正在启动独立浏览器窗口……";
-    try {
-        const result = await requestJson("/api/browser/embedded/start", {method: "POST"});
-        detail.textContent = result.message;
-        await loadSystemStatus();
-    } catch (error) {
-        detail.textContent = error.message;
-    }
-}
-
-async function connectEmbeddedBrowser() {
-    const detail = $("system-detail");
-    const button = $("connect-embedded-browser");
-    const originalText = button.textContent;
-    button.disabled = true;
-    button.textContent = "正在检测……";
-    detail.textContent = "正在检测登录状态并建立连接……";
-    try {
-        const result = await requestJson("/api/browser/embedded/connect", {method: "POST"});
-        await loadSystemStatus();
-        // 状态刷新完成后再次展示本次连接结果，避免具体成功或失败原因被通用提示覆盖。
-        detail.textContent = `${result.message}${result.state ? ` · 状态：${result.state}` : ""}`;
-    } catch (error) {
-        detail.textContent = error.message;
     } finally {
         button.disabled = false;
-        button.textContent = originalText;
     }
 }
-
-async function stopEmbeddedBrowser() {
-    try {
-        const result = await requestJson("/api/browser/embedded/stop", {method: "POST"});
-        if (embeddedStatusTimer) {
-            clearTimeout(embeddedStatusTimer);
-            embeddedStatusTimer = null;
-        }
-        $("system-detail").textContent = result.message;
-        await loadSystemStatus();
-    } catch (error) {
-        $("system-detail").textContent = error.message;
-    }
-}
-
 async function collectJobs() {
     const view = $("collector-result");
     try {
@@ -533,75 +584,14 @@ function loadSample() {
 
 async function loadSystemStatus() {
     try {
-        const system = await requestJson("/api/system/status");
-        const embedded = system.embeddedBrowser || {};
-        const connected = system.browserConnected;
-        const loggedIn = system.loginValid;
-        const managedRunning = Boolean(embedded.running);
-        const managedReady = Boolean(embedded.readyForCollection);
-        // 普通 Edge 启动不等于 Playwright 已连接，登录阶段必须明确显示为待人工处理。
-        $("system-status").textContent = managedRunning
-            ? (managedReady && loggedIn ? "静默连接已就绪 · BOSS 职位页" : "独立 Edge 已启动 · 待登录/连接")
-            : (connected && loggedIn ? "浏览器已连接 · BOSS 已登录" : connected ? "浏览器已连接 · 待处理" : "浏览器待连接");
-        $("system-status").className = "status-pill " + (managedReady && loggedIn ? "status-ok" : "status-warn");
-        const state = embedded.state ? ` · 状态：${embedded.state}` : "";
-        const event = embedded.lastEvent
-            ? ` · 最近事件：${embedded.lastEvent}${embedded.lastEventAt ? `（${embedded.lastEventAt}）` : ""}`
-            : "";
-        const message = embedded.state && embedded.state !== "DISCONNECTED"
-            ? embeddedStatusHint(embedded)
-            : system.message;
-        $("system-detail").textContent = `${message}${state}${event}${embedded.currentUrl ? ` · 页面：${embedded.currentUrl}` : ""}`;
-        // 状态轮询只读取轻量状态，不再自动截取登录页面。
-        if (!embedded.running) await loadBrowserPreview(false);
-        scheduleEmbeddedStatusPolling(embedded.running);
+        const system = await requestJson("/api/system/status", {cache: "no-store"});
+        $("system-status").textContent = "管理端运行正常";
+        $("system-status").className = "status-pill status-ok";
+        $("system-detail").textContent = system.message || "Chrome 扩展状态请在连接管理模块查看";
     } catch (error) {
-        $("system-status").textContent = "状态读取失败";
-        $("system-status").className = "status-pill status-warn";
+        $("system-status").textContent = "管理端不可用";
+        $("system-status").className = "status-pill status-danger";
         $("system-detail").textContent = error.message;
-    }
-}
-
-function scheduleEmbeddedStatusPolling(running) {
-    if (embeddedStatusTimer) {
-        clearTimeout(embeddedStatusTimer);
-        embeddedStatusTimer = null;
-    }
-    if (!running) return;
-    embeddedStatusTimer = setTimeout(() => {
-        loadSystemStatus().catch(() => {
-            embeddedStatusTimer = null;
-        });
-    }, 15000);
-}
-
-async function loadBrowserPreview(running) {
-    const image = $("browser-preview");
-    const empty = $("browser-preview-empty");
-    if (!running) {
-        image.hidden = true;
-        image.removeAttribute("src");
-        empty.hidden = false;
-        empty.textContent = "启动独立 Edge 并建立连接后，这里会显示当前页面预览。";
-        return;
-    }
-    try {
-        const response = await secureFetch(`/api/browser/embedded/preview?timestamp=${Date.now()}`, {cache: "no-store"});
-        if (response.status === 403) throw new Error("页面预览默认关闭，可通过 BOSS_PREVIEW_ENABLED=true 显式开启");
-        if (!response.ok) throw new Error("preview unavailable");
-        const blob = await response.blob();
-        if (image.dataset.objectUrl) URL.revokeObjectURL(image.dataset.objectUrl);
-        const objectUrl = URL.createObjectURL(blob);
-        image.dataset.objectUrl = objectUrl;
-        image.src = objectUrl;
-        image.hidden = false;
-        empty.hidden = true;
-    } catch (error) {
-        image.hidden = true;
-        empty.hidden = false;
-        empty.textContent = error.message === "preview unavailable"
-            ? "暂时无法读取浏览器预览，请刷新状态或检查独立浏览器窗口。"
-            : error.message;
     }
 }
 
@@ -648,25 +638,19 @@ $("collect-jobs").addEventListener("click", collectJobs);
 $("rebuild-queue").addEventListener("click", rebuildQueue);
 $("refresh-queue").addEventListener("click", () => loadQueue().catch((error) => $("queue-message").textContent = error.message));
 $("confirm-queue").addEventListener("click", confirmQueue);
-$("refresh-system").addEventListener("click", loadSystemStatus);
-$("connect-embedded-browser").addEventListener("click", connectEmbeddedBrowser);
-$("refresh-browser-preview").addEventListener("click", async () => {
-    const empty = $("browser-preview-empty");
-    empty.hidden = false;
-    empty.textContent = "正在按你的操作读取一次页面预览……";
-    await loadBrowserPreview(true);
-});
-$("start-embedded-browser").addEventListener("click", startEmbeddedBrowser);
-$("stop-embedded-browser").addEventListener("click", stopEmbeddedBrowser);
-$("start-embedded-collector").addEventListener("click", collectFromEmbeddedBrowser);
+$("collect-from-chrome").addEventListener("click", collectFromChrome);
+updateChromeCollectionGuide();
+$("copy-management-url").addEventListener("click", copyManagementUrl);
+$("show-collection-steps").addEventListener("click", showCollectionSteps);
 initTabs();
 init().catch((error) => {
     $("policy-message").textContent = error.message;
     $("system-detail").textContent = "本地服务尚未准备好，请确认 18080 端口已启动。";
 });
 
-
-
-
-
-
+window.setInterval(() => {
+    const activeTab = document.querySelector("[data-tab-target].active")?.dataset.tabTarget;
+    if (document.visibilityState === "visible" && activeTab === "delivery") {
+        loadDeliveryTasks().catch(() => {});
+    }
+}, 15000);

@@ -1,9 +1,7 @@
 package com.example.bossapply.controller;
 
-import com.example.bossapply.dto.ApplyRequest;
 import com.example.bossapply.dto.QueueConfirmRequest;
 import com.example.bossapply.dto.QueueConfirmationTokenRequest;
-import com.example.bossapply.model.ApplicationResult;
 import com.example.bossapply.model.ConfirmationTokenView;
 import com.example.bossapply.model.QueueItemView;
 import com.example.bossapply.service.DeliveryQueueService;
@@ -65,23 +63,6 @@ public class DeliveryQueueController {
     @PostMapping("/queue/confirm")
     public ResponseEntity<List<QueueItemView>> confirm(@Valid @RequestBody QueueConfirmRequest request) {
         return ResponseEntity.ok(deliveryQueueService.confirm(request));
-    }
-
-    /**
-     * 在人工确认弹窗后申请单条投递准备令牌。
-     */
-    @PostMapping("/applications/{queueId}/confirmation-token")
-    public ConfirmationTokenView issueSingleApplyToken(@PathVariable long queueId) {
-        return deliveryQueueService.issueSingleApplyToken(queueId);
-    }
-
-    /**
-     * 为单条已确认职位执行投递前置检查，实际点击仍由用户在 BOSS 页面完成。
-     */
-    @PostMapping("/applications/{queueId}/apply")
-    public ResponseEntity<ApplicationResult> prepareSingleApply(@PathVariable long queueId,
-                                                                 @Valid @RequestBody ApplyRequest request) {
-        return ResponseEntity.ok(deliveryQueueService.prepareSingleApply(queueId, request));
     }
 
     private LocalDate parseDate(String value) {

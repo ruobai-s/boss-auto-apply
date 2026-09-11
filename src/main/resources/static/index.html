@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>BOSS 自动投递管理端</title>
-    <link rel="stylesheet" href="/styles.css?v=20260909-4">
+    <link rel="stylesheet" href="/styles.css?v=20260911-2">
 </head>
 <body>
 <main class="page-shell">
@@ -14,13 +14,15 @@
             <h1>BOSS 自动投递管理端</h1>
             <p class="subtitle">本地运行 · 手机电脑均可访问 · 外包公司自动排除</p>
         </div>
-        <div class="status-actions"><span id="system-status" class="status-pill status-warn">浏览器待连接</span><button id="start-embedded-browser" class="button primary compact">启动独立 Edge</button><button id="stop-embedded-browser" class="button secondary compact">停止独立 Edge</button><button id="refresh-system" class="button secondary compact">刷新状态</button><button id="connect-embedded-browser" class="button secondary compact">登录后建立连接</button></div>
+        <div class="topbar-actions">
+            <div class="status-actions"><span id="system-status" class="status-pill status-warn">正在检查管理端</span><button id="refresh-system" class="button secondary compact">刷新状态</button></div>
+        </div>
     </header>
 
     <section class="notice">
-        <strong>当前为本地数据 MVP</strong>
-        <span>先采集和筛选，再由你逐条确认；本地服务不会批量点击投递，也不保存密码、验证码或 Cookie。</span>
-        <p id="system-detail" class="system-detail">正在读取本地浏览器连接和 BOSS 页面状态……</p>
+        <strong>当前为本地自动投递 MVP</strong>
+        <span>先采集、筛选并确认候选岗位；确认后自动进入投递任务，Chrome 扩展会在后台按顺序执行。遇到验证码、访问限制或无法确认结果时会立即停止并提示人工处理。</span>
+        <p id="system-detail" class="system-detail">正在读取本地管理端状态；Chrome 扩展状态请在连接管理模块查看……</p>
     </section>
 
     <nav class="module-tabs" role="tablist" aria-label="管理功能切换">
@@ -28,6 +30,7 @@
         <button id="tab-policy" class="module-tab" type="button" role="tab" aria-selected="false" aria-controls="panel-policy" data-tab-target="policy" tabindex="-1">投递策略</button>
         <button id="tab-collector" class="module-tab" type="button" role="tab" aria-selected="false" aria-controls="panel-collector" data-tab-target="collector" tabindex="-1">职位采集</button>
         <button id="tab-queue" class="module-tab" type="button" role="tab" aria-selected="false" aria-controls="panel-queue" data-tab-target="queue" tabindex="-1">候选队列</button>
+        <button id="tab-delivery" class="module-tab" type="button" role="tab" aria-selected="false" aria-controls="panel-delivery" data-tab-target="delivery" tabindex="-1">投递任务</button>
         <button id="tab-outsourcing" class="module-tab" type="button" role="tab" aria-selected="false" aria-controls="panel-outsourcing" data-tab-target="outsourcing" tabindex="-1">外包规则</button>
         <button id="tab-jobs" class="module-tab" type="button" role="tab" aria-selected="false" aria-controls="panel-jobs" data-tab-target="jobs" tabindex="-1">职位记录</button>
     </nav>
@@ -41,7 +44,7 @@
             </div>
             <span id="extension-state" class="status-pill status-warn">正在检查</span>
         </div>
-        <p class="helper-text extension-help">扩展只向本机管理端上报 BOSS 标签页、页面类型、登录和安全状态，不上传 Cookie 或完整 DOM。出现访问限制或安全验证时，系统只会停止后续操作并提示人工处理。</p>
+        <p class="helper-text extension-help">扩展平时只上报结构化连接状态；只有用户主动点击采集时才读取当前职位列表的结构化字段，不上传 Cookie 或完整 DOM。出现访问限制或安全验证时，系统只会停止后续操作并提示人工处理。</p>
         <div class="extension-layout">
             <div class="extension-status-grid" aria-label="Chrome 扩展连接状态">
                 <div><span>扩展版本</span><strong id="extension-version">-</strong></div>
@@ -69,24 +72,6 @@
             <button id="refresh-extension-status" class="button secondary">刷新状态</button>
             <button id="unpair-extension" class="button secondary" disabled>解除配对</button>
             <span id="extension-message" class="helper-text">正在读取扩展连接状态……</span>
-        </div>
-    </section>
-    <section class="card browser-card">
-        <div class="card-heading">
-            <div>
-                <p class="section-label">受支持浏览器连接器</p>
-                <h2>独立 Edge 登录与预览</h2>
-            </div>
-            <span class="tag safe-tag">独立临时会话</span>
-        </div>
-        <p class="helper-text browser-help">系统先启动普通 Edge 独立进程，登录期间不会建立自动化连接。请在该窗口中人工登录，完成后再点击“登录后建立连接”；停止后会删除本次临时浏览器会话。管理端默认仅允许本机访问；局域网访问必须配置独立管理令牌。</p>
-        <div class="browser-preview-shell">
-            <div id="browser-preview-empty" class="empty-state">页面预览默认关闭，避免泄露账号和职位信息。</div>
-            <img id="browser-preview" class="browser-preview" alt="独立 Edge 当前页面预览" hidden>
-        </div>
-        <div class="action-row">
-            <button id="refresh-browser-preview" class="button secondary">刷新页面预览</button>
-            <span class="helper-text">如确有需要，可在启动前显式设置 BOSS_PREVIEW_ENABLED=true；登录和安全验证期间仍不会自动截图。</span>
         </div>
     </section>
     </div>
@@ -142,17 +127,25 @@
         <div class="card-heading">
             <div>
                 <p class="section-label">BOSS 职位采集</p>
-                <h2>导入职位快照并筛选</h2>
+                <h2>从 Chrome 当前页采集并筛选</h2>
             </div>
             <span class="tag safe-tag">只采集 · 不投递</span>
         </div>
-        <p class="helper-text collector-help">先启动独立 Edge，在弹出的独立窗口中手动登录 BOSS 并打开职位列表；回到管理端点击“登录后建立连接”，连接成功后再点击“从独立 Edge 采集”。系统只读取当前页已加载职位，不翻页、不处理验证码、不点击投递按钮。</p>
+        <p class="helper-text collector-help">请在安装扩展的 Chrome 中打开本管理页，并在同一个 Chrome 中打开 BOSS 职位列表；页面加载完成后点击“从 Chrome 当前页采集”。列表页会读取当前已加载卡片中的经验、学历、公司规模/行业、福利/职位标签、发布时间、急招和在线状态；用户主动打开单个职位详情后，可再次点击采集补充职位描述。系统不自动批量打开详情、不滚动、不翻页、不刷新、不处理验证码，也不点击投递按钮。</p>
+        <div id="chrome-collection-guide" class="collection-guide" hidden>
+            <strong>当前页面不能直接调用 Chrome 扩展</strong>
+            <span>你现在可能是在内置浏览器中打开管理端。请复制地址到普通 Chrome 打开，再点击采集；也可以直接在 Chrome 工具栏的扩展弹窗中点击“采集当前职位页”。</span>
+            <div class="action-row guide-actions">
+                <button id="copy-management-url" class="button secondary compact" type="button">复制管理端地址</button>
+                <button id="show-collection-steps" class="button secondary compact" type="button">查看操作步骤</button>
+            </div>
+        </div>
         <textarea id="jobs-json" rows="9" placeholder='{"capturedAt":"2026-09-07T15:00:00+08:00","jobs":[{"source":"BOSS","sourceJobId":"job-001","companyName":"示例科技","companyIntroduction":"软件产品研发","jobName":"Java开发","jobDescription":"负责后端接口开发","city":"北京","salary":"20-30K","jobUrl":"https://www.zhipin.com/job_detail/example.html","publishedAt":"2026-09-07"}]}'></textarea>
         <div class="action-row">
-            <button id="start-embedded-collector" class="button primary">从独立 Edge 采集</button>
-            <button id="load-sample" class="button secondary">填入示例</button>
-            <button id="collect-jobs" class="button secondary">导入并筛选</button>
-            <span id="collector-result" class="result-text">等待导入职位快照</span>
+            <button id="collect-from-chrome" class="button primary" type="button">从 Chrome 当前页采集</button>
+            <button id="load-sample" class="button secondary" type="button">填入示例</button>
+            <button id="collect-jobs" class="button secondary" type="button">导入并筛选</button>
+            <span id="collector-result" class="result-text">等待从 Chrome 采集或手工导入职位快照</span>
         </div>
     </section>
     </div>
@@ -164,7 +157,10 @@
                 <p class="section-label">候选岗位队列</p>
                 <h2>按城市额度生成待确认列表</h2>
             </div>
-            <span class="tag safe-tag">人工确认前不投递</span>
+            <div class="queue-header-actions">
+                <span class="tag safe-tag">确认后自动进入投递任务</span>
+                <button id="confirm-queue" class="button success" type="button">确认所选职位</button>
+            </div>
         </div>
         <div class="queue-toolbar">
             <div>
@@ -181,9 +177,23 @@
         <div id="queue-list" class="queue-list">
             <p class="empty-state">还没有生成今日候选队列。</p>
         </div>
-        <div class="action-row queue-confirm-row">
-            <button id="confirm-queue" class="button success">确认所选职位</button>
-            <span class="helper-text">确认只批准所选岗位，之后仍需逐条点击“准备单条投递”。</span>
+        <p class="helper-text queue-confirm-help">确认后立即创建投递任务；Chrome 扩展会后台领取并串行执行，无需再次点击。投递任务详情请切换到“投递任务”Tab 查看。</p>
+    </section>
+    </div>
+
+    <div id="panel-delivery" class="tab-panel" role="tabpanel" aria-labelledby="tab-delivery" data-tab-panel="delivery" hidden>
+    <section class="card delivery-card">
+        <div class="card-heading">
+            <div>
+                <p class="section-label">投递任务管理</p>
+                <h2>已确认岗位的后台投递进度</h2>
+            </div>
+            <span class="tag safe-tag">Chrome 扩展后台执行</span>
+        </div>
+        <p class="helper-text delivery-help">这里展示当前候选队列计划日期下的投递任务。扩展会按队列顺序领取任务，同一时刻只执行一个岗位；本页面会自动刷新任务状态。</p>
+        <div class="queue-summary"><span>投递任务</span><strong>后台自动刷新</strong></div>
+        <div id="delivery-task-list" class="queue-list">
+            <p class="empty-state">确认候选岗位后，投递任务会自动出现在这里。</p>
         </div>
     </section>
     </div>
@@ -267,17 +277,10 @@
         <span>策略、职位和候选队列保存于本地 SQLite，重启后保留</span>
     </footer>
 </main>
-<script src="/api.js?v=20260909-4"></script>
-<script src="/app.js?v=20260909-4"></script>
-<script src="/modules/connection.js?v=20260909-4"></script>
+<script src="/api.js?v=20260910-5"></script>
+<script src="/app.js?v=20260911-2"></script>
+<script src="/modules/connection.js?v=20260910-5"></script>
 </body>
 </html>
-
-
-
-
-
-
-
 
 

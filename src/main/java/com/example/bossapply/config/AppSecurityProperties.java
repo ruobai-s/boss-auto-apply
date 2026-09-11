@@ -12,7 +12,6 @@ public class AppSecurityProperties {
 
     private boolean allowLan;
     private String adminToken = "";
-    private boolean previewEnabled;
     private int requestsPerMinute = 120;
     private int sensitiveRequestsPerMinute = 20;
     private long maxRequestBodyBytes = 1_048_576L;
@@ -32,14 +31,6 @@ public class AppSecurityProperties {
 
     public void setAdminToken(String adminToken) {
         this.adminToken = adminToken == null ? "" : adminToken.trim();
-    }
-
-    public boolean isPreviewEnabled() {
-        return previewEnabled;
-    }
-
-    public void setPreviewEnabled(boolean previewEnabled) {
-        this.previewEnabled = previewEnabled;
     }
 
     public int getRequestsPerMinute() {
@@ -74,3 +65,4 @@ public class AppSecurityProperties {
         this.confirmationTokenTtlSeconds = confirmationTokenTtlSeconds;
     }
 }
+

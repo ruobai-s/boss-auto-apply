@@ -2,6 +2,7 @@ package com.example.bossapply.service;
 
 import com.example.bossapply.config.ExtensionConnectionProperties;
 import com.example.bossapply.dto.ExtensionHeartbeatRequest;
+import com.example.bossapply.dto.ExtensionJobCollectRequest;
 import com.example.bossapply.dto.ExtensionPairRequest;
 import com.example.bossapply.infrastructure.SqliteDatabaseService;
 import com.example.bossapply.model.ExtensionConnectionStatus;
@@ -124,6 +125,59 @@ public class ExtensionConnectionService {
         return new ExtensionHeartbeatResult(true, status().state(), format(now));
     }
 
+    /**
+     * 校验职位采集请求只能来自当前已配对、在线且处于安全职位列表页或详情页的扩展实例。
+     */
+    /** 校验投递任务请求来自当前已配对扩展实例。 */
+    public void validateExtensionInstance(String instanceId, String origin, String token) {
+        String extensionId = requireExtensionId(origin);
+        ExtensionClient client = loadClient();
+        if (!authenticated(client, extensionId, token)) {
+            throw new SecurityException("扩展身份校验失败，请重新配对");
+        }
+        if (!constantTimeEquals(client.instanceId(), requireText(instanceId, "扩展实例标识", 80))) {
+            throw new SecurityException("扩展实例与已配对实例不一致");
+        }
+    }
+    public void validateJobCollection(ExtensionJobCollectRequest request,
+                                      String origin,
+                                      String token) {
+        String extensionId = requireExtensionId(origin);
+        ExtensionClient client = loadClient();
+        if (!authenticated(client, extensionId, token)) {
+            throw new SecurityException("扩展身份校验失败，请重新配对");
+        }
+
+        String instanceId = requireText(request.instanceId(), "扩展实例标识", 80);
+        if (!constantTimeEquals(client.instanceId(), instanceId)) {
+            throw new SecurityException("扩展实例与已配对实例不一致");
+        }
+        String extensionVersion = requireText(request.extensionVersion(), "扩展版本", 30);
+        if (!constantTimeEquals(client.extensionVersion(), extensionVersion)) {
+            throw new IllegalArgumentException("扩展版本状态尚未同步，请刷新扩展状态后重试");
+        }
+        if (client.lastHeartbeatAt() == null
+                || !client.lastHeartbeatAt().plusSeconds(properties.getHeartbeatTimeoutSeconds()).isAfter(clock.instant())) {
+            throw new IllegalArgumentException("扩展心跳已超时，请刷新扩展状态后重试");
+        }
+        if (!client.bossTabFound() || !client.contentScriptReady()) {
+            throw new IllegalArgumentException("BOSS 页面或页面连接脚本尚未就绪");
+        }
+
+        String pageType = normalizeEnum(request.pageType(), PAGE_TYPES, "UNKNOWN");
+        String loginState = normalizeEnum(request.loginState(), LOGIN_STATES, "UNKNOWN");
+        String securityState = normalizeEnum(request.securityState(), SECURITY_STATES, "UNKNOWN");
+        boolean supportedPage = "JOB_LIST".equals(pageType) || "JOB_DETAIL".equals(pageType);
+        if (!supportedPage || !pageType.equals(client.pageType())) {
+            throw new IllegalArgumentException("只能采集当前 BOSS 职位列表页或职位详情页");
+        }
+        if (!"LOGGED_IN".equals(loginState) || !"LOGGED_IN".equals(client.loginState())) {
+            throw new IllegalArgumentException("尚未确认 BOSS 登录状态，不能采集职位");
+        }
+        if (!"NORMAL".equals(securityState) || !"NORMAL".equals(client.securityState())) {
+            throw new IllegalArgumentException("检测到访问限制或安全验证，已停止职位采集");
+        }
+    }
     /**
      * 供扩展安全过滤器校验来源扩展和令牌。
      */
@@ -456,4 +510,5 @@ public class ExtensionConnectionService {
     ) {
     }
 }
+
 

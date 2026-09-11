@@ -153,7 +153,7 @@ class AdminAccessFilterTest {
         MockHttpServletResponse lastResponse = null;
         for (int index = 0; index < 3; index++) {
             MockHttpServletRequest request = request("POST", "127.0.0.1");
-            request.setRequestURI("/api/browser/embedded/collect");
+            request.setRequestURI("/api/queue/rebuild");
             request.addHeader("X-Forwarded-For", "192.168.1." + index);
             request.addHeader(AdminAccessFilter.REQUEST_HEADER, AdminAccessFilter.REQUEST_HEADER_VALUE);
             lastResponse = new MockHttpServletResponse();
@@ -185,4 +185,5 @@ class AdminAccessFilterTest {
         return request;
     }
 }
+
 

@@ -21,6 +21,8 @@ body { margin: 0; background: var(--background); color: var(--ink); }
 button, input { font: inherit; }
 .page-shell { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 36px 0 28px; }
 .topbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
+.topbar-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 12px; }
+.auto-apply-button { min-width: 132px; min-height: 48px; padding: 0 22px; font-size: 16px; box-shadow: 0 8px 18px rgba(22, 132, 91, .18); }
 .eyebrow, .section-label { margin: 0 0 8px; color: var(--primary); font-size: 12px; font-weight: 800; letter-spacing: .12em; }
 h1, h2, p { margin-top: 0; }
 h1 { margin-bottom: 8px; font-size: clamp(27px, 4vw, 42px); letter-spacing: -.04em; }
@@ -73,6 +75,8 @@ code { padding: 2px 5px; border-radius: 5px; background: #e9edf4; }
 @media (max-width: 760px) {
     .page-shell { width: min(100% - 20px, 560px); padding-top: 22px; }
     .topbar, .card-heading { flex-direction: column; }
+    .topbar-actions { width: 100%; align-items: stretch; }
+    .auto-apply-button { width: 100%; }
     .grid-layout, .filter-grid { grid-template-columns: 1fr; }
     .card { padding: 17px; border-radius: 14px; }
     .city-row { grid-template-columns: 28px minmax(0, 1fr) 76px 64px 34px; gap: 5px; padding: 8px; }
@@ -107,12 +111,18 @@ code { padding: 2px 5px; border-radius: 5px; background: #e9edf4; }
 .system-detail { margin: 10px 0 0; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
 .browser-card { margin-top: 20px; }
 .browser-help { margin-top: -8px; margin-bottom: 12px; }
-.browser-preview-shell { min-height: 180px; display: grid; place-items: center; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: #f8f9fc; }
-.browser-preview { display: block; width: 100%; height: auto; max-height: 520px; object-fit: contain; background: #fff; }
-.collector-card, .queue-card { margin-top: 20px; }
+.collector-card, .queue-card, .delivery-card { margin-top: 20px; }
+/* Chrome 扩展不可调用时的操作引导 */
+.collection-guide { display: grid; gap: 8px; margin: 0 0 14px; padding: 14px 16px; border: 1px solid #f0d89b; border-radius: 12px; background: #fff8e8; color: #72551c; font-size: 13px; line-height: 1.6; }
+.collection-guide[hidden] { display: none; }
+.collection-guide strong { color: #5e4311; }
+.guide-actions { margin-top: 2px; }
+.guide-actions .button { flex: 0 0 auto; }
+
 .collector-help { margin-top: -8px; margin-bottom: 12px; }
 textarea { width: 100%; resize: vertical; min-height: 160px; padding: 12px; border: 1px solid #d8dee8; border-radius: 10px; outline: none; background: #fff; color: var(--ink); font: 13px/1.55 Consolas, "Microsoft YaHei", monospace; }
 textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(49, 94, 251, .12); }
+.queue-header-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
 .queue-toolbar { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
 .queue-toolbar > div:first-child { width: min(220px, 100%); }
 .queue-actions { justify-content: flex-end; }
@@ -132,13 +142,15 @@ textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(49, 94
 .queue-item-actions { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; }
 .queue-check, .check-label { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; color: var(--muted); font-size: 12px; font-weight: 700; }
 .queue-state { padding: 6px 9px; border-radius: 999px; background: var(--success-soft); color: var(--success); font-size: 12px; font-weight: 800; }
-.queue-confirm-row { margin-top: 14px; }
+.queue-confirm-help, .delivery-help { margin-top: 14px; }
+.delivery-card .queue-summary { margin-top: 4px; }
 .city-row { grid-template-columns: 38px minmax(100px, 1fr) 90px 70px 92px 40px; }
 @media (max-width: 760px) {
     .status-actions { justify-content: flex-start; }
     .city-row { grid-template-columns: 28px minmax(0, 1fr) 70px 58px 78px 34px; }
     .queue-item { flex-direction: column; }
     .queue-item-actions { justify-content: flex-start; }
+    .queue-header-actions { justify-content: flex-start; }
 }
 
 /* 外包公司名单和多条件规则管理 */
@@ -213,3 +225,9 @@ textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(49, 94
     .extension-status-grid { grid-template-columns: 1fr; }
     .pairing-code { font-size: 22px; }
 }
+
+/* 职位扩展采集字段，保持卡片在桌面和移动端均可换行。 */
+.job-collected-fields, .job-collected-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.job-collected-fields span, .job-collected-tags span { padding: 3px 7px; border-radius: 999px; background: #edf2ff; color: #3b4b75; font-size: 11px; line-height: 1.4; }
+.job-collected-tags span { background: #edf8f1; color: #256342; }
+.job-description-preview { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; }

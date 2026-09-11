@@ -23,7 +23,6 @@ import java.util.concurrent.ConcurrentHashMap;
 public class OperationConfirmationService {
 
     private static final String QUEUE_CONFIRM = "QUEUE_CONFIRM";
-    private static final String SINGLE_APPLY = "SINGLE_APPLY";
 
     private final SecureRandom secureRandom = new SecureRandom();
     private final ConcurrentHashMap<String, ConfirmationEntry> confirmations = new ConcurrentHashMap<>();
@@ -37,17 +36,11 @@ public class OperationConfirmationService {
         return issue(QUEUE_CONFIRM, canonicalQueueIds(queueIds));
     }
 
-    public ConfirmationTokenView issueSingleApply(long queueId) {
-        return issue(SINGLE_APPLY, Long.toString(queueId));
-    }
 
     public void consumeQueueConfirmation(String token, List<Long> queueIds) {
         consume(token, QUEUE_CONFIRM, canonicalQueueIds(queueIds));
     }
 
-    public void consumeSingleApply(String token, long queueId) {
-        consume(token, SINGLE_APPLY, Long.toString(queueId));
-    }
 
     private ConfirmationTokenView issue(String operation, String resource) {
         cleanupExpired();

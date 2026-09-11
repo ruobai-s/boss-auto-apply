@@ -41,10 +41,6 @@ public class AdminAccessFilter extends OncePerRequestFilter {
 
     private static final long RATE_WINDOW_MILLIS = 60_000L;
     private static final Set<String> SENSITIVE_PATHS = Set.of(
-            "/api/browser/embedded/start",
-            "/api/browser/embedded/connect",
-            "/api/browser/embedded/stop",
-            "/api/browser/embedded/collect",
             "/api/filter/rules",
             "/api/queue/rebuild",
             "/api/queue/confirm",
@@ -157,8 +153,7 @@ public class AdminAccessFilter extends OncePerRequestFilter {
         if (requestUri == null) {
             return false;
         }
-        return SENSITIVE_PATHS.contains(requestUri)
-                || requestUri.matches("^/api/applications/[^/]+/(apply|confirmation-token)$");
+        return SENSITIVE_PATHS.contains(requestUri);
     }
 
     private void cleanupExpiredRateWindows(long now) {
@@ -309,5 +304,4 @@ public class AdminAccessFilter extends OncePerRequestFilter {
         }
     }
 }
-
 

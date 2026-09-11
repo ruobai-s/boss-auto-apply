@@ -46,7 +46,7 @@ public class JobController {
     }
 
     /**
-     * 将职位标记为已投递，实际页面点击将在后续适配器接入。
+     * Chrome 扩展完成自动投递点击后，将职位和对应候选队列标记为已投递。
      */
     @PostMapping("/{source}/{sourceJobId}/applied")
     public JobRecord markApplied(@PathVariable String source, @PathVariable String sourceJobId) {

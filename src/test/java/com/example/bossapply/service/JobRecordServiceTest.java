@@ -71,6 +71,33 @@ class JobRecordServiceTest {
     }
 
     @Test
+    void 详情采集应只补充非空字段且保留已有三态状态() {
+        jobRecordService.register(new JobRecordRequest(
+                "BOSS", "merge-001", "原公司", "原公司介绍", "Java开发", "列表摘要",
+                "杭州", "20-30K", "https://example.com/old", "昨天", "3-5年", "本科",
+                "100-499人", "软件行业", List.of("五险一金"), List.of("Java"), true, false));
+
+        JobRecord merged = jobRecordService.register(new JobRecordRequest(
+                "BOSS", "merge-001", "", "详情公司介绍", "", "完整职位描述",
+                "", "", "https://example.com/new", "", null, null, null, "互联网",
+                List.of(), List.of("Spring Boot"), null, null)).job();
+
+        assertEquals("原公司", merged.companyName());
+        assertEquals("详情公司介绍", merged.companyIntroduction());
+        assertEquals("完整职位描述", merged.jobDescription());
+        assertEquals("https://example.com/new", merged.jobUrl());
+        assertEquals("昨天", merged.publishedAt());
+        assertEquals("3-5年", merged.experienceRequirement());
+        assertEquals("本科", merged.educationRequirement());
+        assertEquals("100-499人", merged.companySize());
+        assertEquals("互联网", merged.companyIndustry());
+        assertEquals(List.of("五险一金"), merged.welfareTags());
+        assertEquals(List.of("Spring Boot"), merged.jobTags());
+        assertEquals(Boolean.TRUE, merged.urgent());
+        assertEquals(Boolean.FALSE, merged.online());
+    }
+
+    @Test
     void 不同来源职位编号可以分别保存() {
         jobRecordService.register(new JobRecordRequest("BOSS", "job-001", "甲公司", "Java开发", "北京", null, null));
         jobRecordService.register(new JobRecordRequest("BOSS", "job-002", "乙公司", "Java开发", "上海", null, null));

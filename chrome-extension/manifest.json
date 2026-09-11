@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "BOSS 本地投递助手",
-  "version": "0.1.0",
-  "description": "连接本机管理端，检查 BOSS 页面、登录和安全状态。",
+  "version": "0.4.1",
+  "description": "连接本机管理端，分层采集职位列表字段和用户主动打开的职位详情，并后台执行用户确认后的投递任务。",
   "minimum_chrome_version": "120",
   "permissions": [
     "storage",
@@ -11,8 +11,15 @@
   ],
   "host_permissions": [
     "http://127.0.0.1:18080/*",
+    "http://localhost:18080/*",
     "https://www.zhipin.com/*"
   ],
+  "externally_connectable": {
+    "matches": [
+      "http://127.0.0.1:18080/*",
+      "http://localhost:18080/*"
+    ]
+  },
   "background": {
     "service_worker": "background/service-worker.js"
   },
@@ -22,9 +29,23 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://www.zhipin.com/*"],
-      "js": ["content/boss-status.js"],
+      "matches": [
+        "https://www.zhipin.com/*"
+      ],
+      "js": [
+        "content/boss-status.js"
+      ],
       "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "http://127.0.0.1:18080/*",
+        "http://localhost:18080/*"
+      ],
+      "js": [
+        "content/management-bridge.js"
+      ],
+      "run_at": "document_start"
     }
   ]
 }

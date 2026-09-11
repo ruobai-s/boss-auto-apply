@@ -16,14 +16,17 @@
         <button id="pair">完成配对</button>
         <button id="refresh" class="secondary">刷新状态</button>
     </div>
+    <button id="collect" class="collect-button" disabled>采集当前职位页</button>
+    <p id="collect-result" class="collection-result">请先在 Chrome 中打开 BOSS 职位列表或职位详情并确认连接正常。</p>
     <dl>
         <div><dt>扩展版本</dt><dd id="version">-</dd></div>
         <div><dt>BOSS页面</dt><dd id="boss-page">-</dd></div>
         <div><dt>登录状态</dt><dd id="login-state">-</dd></div>
         <div><dt>安全状态</dt><dd id="security-state">-</dd></div>
     </dl>
-    <p class="hint">扩展不会读取或上传 Cookie，不会处理验证码，也不会绕过安全验证。</p>
+    <p class="hint">扩展会响应用户主动采集，并在候选确认后后台轮询投递任务；不会读取 Cookie、上传完整 DOM，也不会处理验证码或绕过访问限制。</p>
 </main>
 <script src="popup.js"></script>
 </body>
 </html>
+

@@ -1,12 +1,16 @@
 package com.example.bossapply.controller;
 
+import com.example.bossapply.dto.BossCollectRequest;
 import com.example.bossapply.dto.ExtensionHeartbeatRequest;
+import com.example.bossapply.dto.ExtensionJobCollectRequest;
 import com.example.bossapply.dto.ExtensionPairRequest;
+import com.example.bossapply.model.BossCollectResult;
 import com.example.bossapply.model.ExtensionConnectionStatus;
 import com.example.bossapply.model.ExtensionHeartbeatResult;
 import com.example.bossapply.model.ExtensionPairResult;
 import com.example.bossapply.model.ExtensionPairingView;
 import com.example.bossapply.security.ExtensionAccessFilter;
+import com.example.bossapply.service.BossCollectorService;
 import com.example.bossapply.service.ExtensionConnectionService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -18,16 +22,20 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Chrome 扩展配对、连接状态和心跳接口。
+ * Chrome 扩展配对、连接状态、心跳和用户主动职位采集接口。
  */
 @RestController
 @RequestMapping("/api/extension")
 public class ExtensionConnectionController {
 
     private final ExtensionConnectionService extensionConnectionService;
+    private final BossCollectorService bossCollectorService;
 
-    public ExtensionConnectionController(ExtensionConnectionService extensionConnectionService) {
+
+    public ExtensionConnectionController(ExtensionConnectionService extensionConnectionService,
+                                         BossCollectorService bossCollectorService) {
         this.extensionConnectionService = extensionConnectionService;
+        this.bossCollectorService = bossCollectorService;
     }
 
     /**
@@ -73,5 +81,18 @@ public class ExtensionConnectionController {
             @RequestHeader(value = "Origin", required = false) String origin,
             @RequestHeader(value = ExtensionAccessFilter.TOKEN_HEADER, required = false) String token) {
         return ResponseEntity.ok(extensionConnectionService.heartbeat(request, origin, token));
+    }
+
+    /**
+     * 接收用户在 Chrome 中主动触发的当前职位列表采集结果。
+     */
+    @PostMapping("/client/jobs")
+    public ResponseEntity<BossCollectResult> collectJobs(
+            @Valid @RequestBody ExtensionJobCollectRequest request,
+            @RequestHeader(value = "Origin", required = false) String origin,
+            @RequestHeader(value = ExtensionAccessFilter.TOKEN_HEADER, required = false) String token) {
+        extensionConnectionService.validateJobCollection(request, origin, token);
+        return ResponseEntity.ok(bossCollectorService.collect(
+                new BossCollectRequest(request.jobs(), request.capturedAt())));
     }
 }

@@ -11,8 +11,6 @@ app:
     # 局域网访问默认关闭，开启时必须同时配置 BOSS_ADMIN_TOKEN。
     allow-lan: ${BOSS_ALLOW_LAN:false}
     admin-token: ${BOSS_ADMIN_TOKEN:}
-    # 页面截图可能包含个人信息，默认关闭。
-    preview-enabled: ${BOSS_PREVIEW_ENABLED:false}
     # 普通状态查询允许较高频率，敏感操作使用更严格的独立限额。
     requests-per-minute: ${BOSS_REQUESTS_PER_MINUTE:120}
     sensitive-requests-per-minute: ${BOSS_SENSITIVE_REQUESTS_PER_MINUTE:20}
@@ -28,22 +26,4 @@ app:
     heartbeat-timeout-seconds: ${BOSS_EXTENSION_HEARTBEAT_TIMEOUT_SECONDS:75}
   database:
     path: runtime/boss-auto-apply.db
-  browser:
-    # 兼容已有外部调试端点，只读探测，不保存浏览器凭据。
-    cdp-url: http://127.0.0.1:9222
-    embedded:
-      # 使用本机安装的普通 Edge 进程；登录完成前不会建立 Playwright 连接。
-      channel: msedge
-      executable-path:
-      # 直接进入求职职位页，避免首页 SEO/安全检查跳转导致临时页面被清空。
-      start-url: https://www.zhipin.com/web/geek/jobs?ka=header-jobs
-      navigation-timeout-ms: 20000
-      # 普通 Edge 启动后等待本地 CDP 端点就绪的最长时间。
-      cdp-startup-timeout-ms: 10000
-      # 浏览器运行期间使用独立临时会话，停止后自动删除。
-      session-root: runtime/browser-sessions
-      # 单次只采集当前页已加载职位，避免高频翻页和触发风控。
-      max-jobs-per-collect: 50
-
-
 

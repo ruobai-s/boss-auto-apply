@@ -1,11 +1,7 @@
 package com.example.bossapply.service;
 
-import com.example.bossapply.dto.ApplyRequest;
 import com.example.bossapply.dto.QueueConfirmRequest;
 import com.example.bossapply.infrastructure.SqliteDatabaseService;
-import com.example.bossapply.model.ApplicationResult;
-import com.example.bossapply.model.BrowserStatus;
-import com.example.bossapply.model.EmbeddedBrowserStatus;
 import com.example.bossapply.model.CityPreference;
 import com.example.bossapply.model.CityQuota;
 import com.example.bossapply.model.JobRecord;
@@ -28,7 +24,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * 候选岗位队列服务，按城市额度生成待确认列表，并支持安全的单条投递准备。
+ * 候选岗位队列服务，按城市额度生成待确认列表并保存人工确认结果。
  */
 @Service
 public class DeliveryQueueService {
@@ -37,24 +33,21 @@ public class DeliveryQueueService {
     private final PolicyStoreService policyStoreService;
     private final CityQuotaService cityQuotaService;
     private final JobRecordService jobRecordService;
-    private final BrowserConnectionService browserConnectionService;
-    private final EmbeddedBrowserService embeddedBrowserService;
     private final OperationConfirmationService operationConfirmationService;
+    private final DeliveryTaskService deliveryTaskService;
 
     public DeliveryQueueService(SqliteDatabaseService databaseService,
                                 PolicyStoreService policyStoreService,
                                 CityQuotaService cityQuotaService,
                                 JobRecordService jobRecordService,
-                                BrowserConnectionService browserConnectionService,
-                                EmbeddedBrowserService embeddedBrowserService,
-                                OperationConfirmationService operationConfirmationService) {
+                                OperationConfirmationService operationConfirmationService,
+                                DeliveryTaskService deliveryTaskService) {
         this.databaseService = databaseService;
         this.policyStoreService = policyStoreService;
         this.cityQuotaService = cityQuotaService;
         this.jobRecordService = jobRecordService;
-        this.browserConnectionService = browserConnectionService;
-        this.embeddedBrowserService = embeddedBrowserService;
         this.operationConfirmationService = operationConfirmationService;
+        this.deliveryTaskService = deliveryTaskService;
     }
 
     /**
@@ -204,6 +197,7 @@ public class DeliveryQueueService {
                     }
                     statement.executeBatch();
                 }
+                deliveryTaskService.createForConfirmedQueue(connection, request.queueIds(), findPlannedDate(connection, request.queueIds()));
                 connection.commit();
                 connection.setAutoCommit(originalAutoCommit);
             } catch (SQLException | RuntimeException exception) {
@@ -218,47 +212,6 @@ public class DeliveryQueueService {
         } catch (SQLException exception) {
             throw new IllegalStateException("确认候选岗位失败", exception);
         }
-    }
-
-    /**
-     * 为已经人工确认的单条岗位生成一次性投递准备令牌。
-     */
-    public ConfirmationTokenView issueSingleApplyToken(long queueId) {
-        QueueRow row = findQueue(queueId);
-        if (!"APPROVED".equals(row.queueStatus())) {
-            throw new IllegalArgumentException("候选岗位尚未通过人工确认");
-        }
-        return operationConfirmationService.issueSingleApply(queueId);
-    }
-
-    /**
-     * 执行单条投递前置检查。当前版本只生成人工操作指引，不代替用户点击外部网站。
-     */
-    public ApplicationResult prepareSingleApply(long queueId, ApplyRequest request) {
-        if (request == null || !request.confirm()) {
-            throw new IllegalArgumentException("单条投递必须明确确认");
-        }
-        QueueRow row = findQueue(queueId);
-        if (!"APPROVED".equals(row.queueStatus())) {
-            throw new IllegalArgumentException("候选岗位尚未通过人工确认");
-        }
-        operationConfirmationService.consumeSingleApply(request.confirmationToken(), queueId);
-        // 优先使用本系统启动的独立 Edge 状态，避免已登录的内置浏览器被旧 CDP 检测误判为未连接。
-        EmbeddedBrowserStatus embeddedStatus = embeddedBrowserService.status();
-        boolean embeddedReady = embeddedStatus.running() && embeddedStatus.loginValid();
-        BrowserStatus browserStatus = embeddedReady ? null : browserConnectionService.probe();
-        boolean cdpReady = browserStatus != null && browserStatus.browserConnected() && browserStatus.loginValid();
-        if (!embeddedReady && !cdpReady) {
-            String message = embeddedStatus.running()
-                    ? "内置 Edge 当前状态为 " + embeddedStatus.state() + "，请先完成登录或安全验证，已阻止投递"
-                    : "浏览器未连接或 BOSS 登录状态无法确认，已阻止投递";
-            return new ApplicationResult(queueId, "BROWSER_NOT_READY", message, row.jobUrl());
-        }
-        boolean openedInEmbeddedBrowser = embeddedReady && embeddedBrowserService.openJobDetail(row.jobUrl());
-        String message = openedInEmbeddedBrowser
-                ? "已在已连接的 Edge 当前页面打开职位详情，请人工确认后点击投递；系统不会代替你点击"
-                : "已通过安全检查，请在 BOSS 页面打开职位详情并手动完成这一条投递，再回到本地页面记录结果";
-        return new ApplicationResult(queueId, "MANUAL_ACTION_REQUIRED", message, row.jobUrl());
     }
 
     private void persistQueue(LocalDate plannedDate, List<QueueCandidate> selected) {
@@ -319,6 +272,21 @@ public class DeliveryQueueService {
         }
     }
 
+    /** 校验本次确认的队列项属于同一计划日期，任务按该日期归档。 */
+    private String findPlannedDate(Connection connection, List<Long> ids) throws SQLException {
+        List<Long> distinctIds = ids.stream().distinct().toList();
+        String placeholders = distinctIds.stream().map(ignored -> "?").reduce((left, right) -> left + "," + right).orElseThrow();
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT DISTINCT planned_date FROM delivery_queue WHERE id IN (" + placeholders + ")")) {
+            for (int index = 0; index < distinctIds.size(); index++) statement.setLong(index + 1, distinctIds.get(index));
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (!resultSet.next()) throw new IllegalArgumentException("候选岗位计划日期不存在");
+                String plannedDate = resultSet.getString(1);
+                if (resultSet.next()) throw new IllegalArgumentException("一次确认只能包含同一计划日期的候选岗位");
+                return plannedDate;
+            }
+        }
+    }
     private List<QueueItemView> listByIds(List<Long> ids) throws SQLException {
         String placeholders = ids.stream().map(ignored -> "?").reduce((left, right) -> left + "," + right).orElseThrow();
         try (Connection connection = databaseService.open();
@@ -399,6 +367,10 @@ public class DeliveryQueueService {
     private record QueueRow(String queueStatus, String jobUrl) {
     }
 }
+
+
+
+
 
 
 

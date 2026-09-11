@@ -1,20 +1,16 @@
 package com.example.bossapply.service;
 
-import com.example.bossapply.dto.ApplyRequest;
 import com.example.bossapply.dto.DeliveryPolicyRequest;
 import com.example.bossapply.dto.JobRecordRequest;
 import com.example.bossapply.dto.QueueConfirmRequest;
 import com.example.bossapply.infrastructure.SqliteDatabaseService;
-import com.example.bossapply.model.ApplicationResult;
 import com.example.bossapply.model.CityPreference;
-import com.example.bossapply.model.EmbeddedBrowserStatus;
 import com.example.bossapply.model.QueueItemView;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.boot.test.mock.mockito.MockBean;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -23,8 +19,6 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
 
 /**
  * 候选队列生成、补量和人工确认测试。
@@ -47,11 +41,7 @@ class DeliveryQueueServiceTest {
     @Autowired
     private SqliteDatabaseService databaseService;
 
-    @MockBean
-    private BrowserConnectionService browserConnectionService;
 
-    @MockBean
-    private EmbeddedBrowserService embeddedBrowserService;
 
     @BeforeEach
     void 清理测试数据() throws Exception {
@@ -94,6 +84,7 @@ class DeliveryQueueServiceTest {
         assertEquals(0, queue.stream().filter(item -> "suspect".equals(item.job().sourceJobId())).count());
     }
 
+
     @Test
     void BOSS城市带区域后缀时仍应匹配优先城市() {
         注册普通职位("beijing-district", "北京·朝阳区");
@@ -102,22 +93,6 @@ class DeliveryQueueServiceTest {
 
         assertEquals(1, queue.size());
         assertEquals("北京", queue.get(0).quotaCity());
-    }
-
-    @Test
-    void 已登录内置Edge时单条投递前置检查不应误用旧CDP连接() {
-        注册普通职位("embedded-1", "北京");
-        List<QueueItemView> queue = deliveryQueueService.rebuild(TEST_DATE);
-        long queueId = queue.get(0).queueId();
-        确认队列(queueId);
-        when(embeddedBrowserService.status()).thenReturn(new EmbeddedBrowserStatus(
-                "READY", true, true, true, true,
-                "https://www.zhipin.com/web/geek/jobs", "BOSS直聘", "已登录", "页面加载完成", "2026-09-07T00:00:00+08:00"));
-
-        ApplicationResult result = 准备单条投递(queueId);
-
-        assertEquals("MANUAL_ACTION_REQUIRED", result.status());
-        verifyNoInteractions(browserConnectionService);
     }
 
     @Test
@@ -137,8 +112,6 @@ class DeliveryQueueServiceTest {
 
         assertEquals("APPLIED", jobRecordService.markApplied("BOSS", "applied-once").applyStatus());
         assertEquals("APPLIED", deliveryQueueService.list(TEST_DATE, null).get(0).queueStatus());
-        assertThrows(IllegalArgumentException.class,
-                () -> 准备单条投递(queueId));
     }
 
     @Test
@@ -159,11 +132,6 @@ class DeliveryQueueServiceTest {
     private List<QueueItemView> 确认队列(long queueId) {
         String token = deliveryQueueService.issueConfirmationToken(List.of(queueId)).token();
         return deliveryQueueService.confirm(new QueueConfirmRequest(List.of(queueId), true, token));
-    }
-
-    private ApplicationResult 准备单条投递(long queueId) {
-        String token = deliveryQueueService.issueSingleApplyToken(queueId).token();
-        return deliveryQueueService.prepareSingleApply(queueId, new ApplyRequest(true, token));
     }
 
     private void 注册普通职位(String id, String city) {

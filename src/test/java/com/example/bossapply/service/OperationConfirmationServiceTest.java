@@ -25,14 +25,10 @@ class OperationConfirmationServiceTest {
     }
 
     @Test
-    void shouldRejectTokenBoundToAnotherQueueOrOperation() {
+    void shouldRejectTokenBoundToAnotherQueue() {
         OperationConfirmationService service = new OperationConfirmationService(new AppSecurityProperties());
         ConfirmationTokenView queueToken = service.issueQueueConfirmation(List.of(1L));
-        ConfirmationTokenView applyToken = service.issueSingleApply(8L);
-
         assertThrows(IllegalArgumentException.class,
                 () -> service.consumeQueueConfirmation(queueToken.token(), List.of(2L)));
-        assertThrows(IllegalArgumentException.class,
-                () -> service.consumeSingleApply(applyToken.token(), 9L));
     }
 }

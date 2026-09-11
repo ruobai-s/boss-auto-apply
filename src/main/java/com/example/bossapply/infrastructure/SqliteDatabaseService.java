@@ -82,6 +82,14 @@ public class SqliteDatabaseService {
                             salary TEXT,
                             job_url TEXT,
                             published_at TEXT,
+                            experience_requirement TEXT,
+                            education_requirement TEXT,
+                            company_size TEXT,
+                            company_industry TEXT,
+                            welfare_tags TEXT,
+                            job_tags TEXT,
+                            urgent INTEGER,
+                            online INTEGER,
                             apply_status TEXT NOT NULL DEFAULT 'DISCOVERED',
                             outsourcing_excluded INTEGER NOT NULL DEFAULT 0,
                             outsourcing_manual_review INTEGER NOT NULL DEFAULT 0,
@@ -96,6 +104,14 @@ public class SqliteDatabaseService {
                 ensureColumn(connection, "company_introduction", "TEXT");
                 ensureColumn(connection, "job_description", "TEXT");
                 ensureColumn(connection, "published_at", "TEXT");
+                ensureColumn(connection, "experience_requirement", "TEXT");
+                ensureColumn(connection, "education_requirement", "TEXT");
+                ensureColumn(connection, "company_size", "TEXT");
+                ensureColumn(connection, "company_industry", "TEXT");
+                ensureColumn(connection, "welfare_tags", "TEXT");
+                ensureColumn(connection, "job_tags", "TEXT");
+                ensureColumn(connection, "urgent", "INTEGER");
+                ensureColumn(connection, "online", "INTEGER");
                 ensureColumn(connection, "outsourcing_excluded", "INTEGER NOT NULL DEFAULT 0");
                 ensureColumn(connection, "outsourcing_manual_review", "INTEGER NOT NULL DEFAULT 0");
                 ensureColumn(connection, "outsourcing_level", "TEXT");
@@ -121,6 +137,72 @@ public class SqliteDatabaseService {
                         )
                         """);
                 statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_delivery_queue_date_status ON delivery_queue(planned_date, queue_status)");
+                statement.executeUpdate("""
+                        CREATE TABLE IF NOT EXISTS delivery_task (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            task_name TEXT NOT NULL,
+                            planned_date TEXT NOT NULL,
+                            task_mode TEXT NOT NULL DEFAULT 'ASSISTED_BATCH',
+                            task_status TEXT NOT NULL DEFAULT 'DRAFT',
+                            total_count INTEGER NOT NULL DEFAULT 0,
+                            waiting_count INTEGER NOT NULL DEFAULT 0,
+                            success_count INTEGER NOT NULL DEFAULT 0,
+                            failed_count INTEGER NOT NULL DEFAULT 0,
+                            unknown_count INTEGER NOT NULL DEFAULT 0,
+                            skipped_count INTEGER NOT NULL DEFAULT 0,
+                            last_error TEXT,
+                            started_at TEXT,
+                            paused_at TEXT,
+                            completed_at TEXT,
+                            created_at TEXT NOT NULL,
+                            updated_at TEXT NOT NULL
+                        )
+                        """);
+                statement.executeUpdate("""
+                        CREATE TABLE IF NOT EXISTS delivery_task_item (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            task_id INTEGER NOT NULL,
+                            queue_id INTEGER NOT NULL,
+                            source TEXT NOT NULL,
+                            source_job_id TEXT NOT NULL,
+                            item_status TEXT NOT NULL DEFAULT 'WAITING',
+                            item_rank INTEGER NOT NULL,
+                            attempt_count INTEGER NOT NULL DEFAULT 0,
+                            last_error TEXT,
+                            failure_reason TEXT,
+                            operator_note TEXT,
+                            prepared_at TEXT,
+                            submitted_at TEXT,
+                            result_at TEXT,
+                            created_at TEXT NOT NULL,
+                            updated_at TEXT NOT NULL,
+                            UNIQUE(task_id, queue_id),
+                            FOREIGN KEY(task_id) REFERENCES delivery_task(id),
+                            FOREIGN KEY(queue_id) REFERENCES delivery_queue(id)
+                        )
+                        """);
+                statement.executeUpdate("""
+                        CREATE TABLE IF NOT EXISTS delivery_task_event (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            task_id INTEGER NOT NULL,
+                            task_item_id INTEGER,
+                            event_type TEXT NOT NULL,
+                            from_status TEXT,
+                            to_status TEXT,
+                            message TEXT,
+                            operator TEXT,
+                            created_at TEXT NOT NULL,
+                            FOREIGN KEY(task_id) REFERENCES delivery_task(id),
+                            FOREIGN KEY(task_item_id) REFERENCES delivery_task_item(id)
+                        )
+                        """);
+                statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_delivery_task_status_date ON delivery_task(task_status, planned_date)");
+                statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_delivery_task_item_task_status ON delivery_task_item(task_id, item_status)");
+                statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_delivery_task_item_job ON delivery_task_item(source, source_job_id)");
+                ensureTableColumn(connection, "delivery_task_item", "claim_instance_id", "TEXT");
+                ensureTableColumn(connection, "delivery_task_item", "lease_until", "TEXT");
+                ensureTableColumn(connection, "delivery_task_item", "execution_token_hash", "TEXT");
+                statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_delivery_task_event_task ON delivery_task_event(task_id, created_at)");
                 statement.executeUpdate("""
                         CREATE TABLE IF NOT EXISTS extension_client (
                             id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -155,8 +237,13 @@ public class SqliteDatabaseService {
      * 为已有数据库补充新字段，避免升级时删除本地历史职位。
      */
     private void ensureColumn(Connection connection, String columnName, String definition) throws SQLException {
+        ensureTableColumn(connection, "job_record", columnName, definition);
+    }
+
+    /** 为指定表补充兼容字段，保留已有本地数据库数据。 */
+    private void ensureTableColumn(Connection connection, String tableName, String columnName, String definition) throws SQLException {
         try (Statement statement = connection.createStatement();
-             ResultSet resultSet = statement.executeQuery("PRAGMA table_info(job_record)")) {
+             ResultSet resultSet = statement.executeQuery("PRAGMA table_info(" + tableName + ")")) {
             while (resultSet.next()) {
                 if (columnName.equals(resultSet.getString("name"))) {
                     return;
@@ -164,9 +251,12 @@ public class SqliteDatabaseService {
             }
         }
         try (Statement statement = connection.createStatement()) {
-            statement.executeUpdate("ALTER TABLE job_record ADD COLUMN " + columnName + " " + definition);
+            statement.executeUpdate("ALTER TABLE " + tableName + " ADD COLUMN " + columnName + " " + definition);
         }
     }
 }
+
+
+
 
 
